@@ -6,6 +6,7 @@ import { Sidebar } from '@/components/layout/Sidebar';
 import { Header } from '@/components/layout/Header';
 import { CommandMenu } from '@/components/modals/CommandMenu';
 import { QuickActionModals } from '@/components/modals/QuickActionModals';
+import { MobileWorkerModal } from '@/components/modals/MobileWorkerModal';
 
 // Core Views
 import { DashboardView } from '@/components/views/DashboardView';
@@ -79,6 +80,7 @@ const FarmAppContent: React.FC = () => {
       {/* Global Modals */}
       <CommandMenu />
       <QuickActionModals />
+      <MobileWorkerModal />
     </div>
   );
 };

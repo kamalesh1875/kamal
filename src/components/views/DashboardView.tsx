@@ -14,7 +14,8 @@ import {
   Users,
   Clock,
   Sparkles,
-  ChevronRight
+  ChevronRight,
+  Smartphone
 } from 'lucide-react';
 import { useFarm } from '@/context/FarmContext';
 import { StatCard } from '@/components/ui/StatCard';
@@ -35,32 +36,40 @@ import {
 export const DashboardView: React.FC = () => {
   const {
     goats,
+    pens,
     sales,
     expenses,
     inventory,
     tasks,
+    customers,
+    overdueAlerts,
+    currentRole,
     setActiveTab,
     setQuickActionModal,
-    setSelectedGoatId
+    setSelectedGoatId,
+    setIsMobileWorkerOpen
   } = useFarm();
 
   // Layer 1: Business Health calculations
-  const totalRevenue = sales.reduce((acc, s) => acc + s.totalAmount, 0);
-  const totalCashCollected = sales.reduce((acc, s) => acc + s.paidAmount, 0);
+  const completedSales = sales.filter(s => s.status !== 'CANCELLED');
+  const totalRevenue = completedSales.reduce((acc, s) => acc + s.totalAmount, 0);
+  const totalCashCollected = completedSales.reduce((acc, s) => acc + s.paidAmount, 0);
   const totalExpenses = expenses.reduce((acc, e) => acc + e.amount, 0);
-  const totalLivestockAssetValue = goats
-    .filter(g => g.status === 'ACTIVE' || g.status === 'PREGNANT' || g.status === 'QUARANTINE')
-    .reduce((acc, g) => acc + g.estimatedMarketValue, 0);
-  const totalTrueCostInvested = goats
-    .filter(g => g.status === 'ACTIVE' || g.status === 'PREGNANT' || g.status === 'QUARANTINE')
-    .reduce((acc, g) => acc + g.trueCost, 0);
+  const totalOutstandingCredit = customers.reduce((acc, c) => acc + c.outstandingBalance, 0);
+  const totalOverdueCredit = overdueAlerts.reduce((acc, o) => acc + o.totalOverdue, 0);
+
+  const activeGoats = goats.filter(g => g.status === 'ACTIVE' || g.status === 'PREGNANT' || g.status === 'QUARANTINE');
+  const totalBiomassKg = Math.round(activeGoats.reduce((acc, g) => acc + g.currentWeightKg, 0));
+  const totalLivestockAssetValue = activeGoats.reduce((acc, g) => acc + g.estimatedMarketValue, 0);
+  const totalTrueCostInvested = activeGoats.reduce((acc, g) => acc + g.trueCost, 0);
   const unrealizedProfit = totalLivestockAssetValue - totalTrueCostInvested;
 
   // Layer 2: Farm Health calculations
-  const activeGoats = goats.filter(g => g.status === 'ACTIVE' || g.status === 'PREGNANT' || g.status === 'QUARANTINE');
-  const totalBiomassKg = Math.round(activeGoats.reduce((acc, g) => acc + g.currentWeightKg, 0));
   const avgWeightKg = activeGoats.length > 0 ? (totalBiomassKg / activeGoats.length).toFixed(1) : 0;
   const avgADG = activeGoats.length > 0 ? Math.round(activeGoats.reduce((acc, g) => acc + g.adgGrams, 0) / activeGoats.length) : 0;
+  const soldGoatsCount = goats.filter(g => g.status === 'SOLD').length;
+  const deadGoatsCount = goats.filter(g => g.status === 'DEAD').length;
+  const mortalityRate = goats.length > 0 ? ((deadGoatsCount / goats.length) * 100).toFixed(1) : '0.0';
 
   // Layer 3: Actionable Alerts
   const lowStockItems = inventory.filter(i => i.currentStock <= i.minimumStockLevel);
@@ -70,7 +79,7 @@ export const DashboardView: React.FC = () => {
     return daysSince > 14;
   }).length;
 
-  // Mock Trend Chart Data
+  // Financial Trend Data
   const financialTrendData = [
     { month: 'May', sales: 12000, feedCost: 6500, laborCost: 4000 },
     { month: 'Jun', sales: 24000, feedCost: 9200, laborCost: 4000 },
@@ -100,7 +109,7 @@ export const DashboardView: React.FC = () => {
               <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-400/30 text-[10px] font-semibold px-2.5 py-0.5 rounded-full uppercase tracking-wider">
                 Commercial Feedlot Operating System
               </span>
-              <span className="text-emerald-300/80 text-xs">Live Farm Sync</span>
+              <span className="text-emerald-300/80 text-xs">Live Farm Sync • Role: {currentRole}</span>
             </div>
             <h1 className="mt-2 text-2xl font-bold tracking-tight text-white">
               MSK Commercial Goat Farm
@@ -118,6 +127,15 @@ export const DashboardView: React.FC = () => {
               onClick={() => setActiveTab('pos')}
             >
               Launch POS Screen
+            </Button>
+            <Button
+              variant="outline"
+              size="md"
+              className="bg-white/10 text-white border-white/20 hover:bg-white/20"
+              icon={Smartphone}
+              onClick={() => setIsMobileWorkerOpen(true)}
+            >
+              Mobile Worker Mode
             </Button>
             <Button
               variant="outline"
@@ -147,11 +165,18 @@ export const DashboardView: React.FC = () => {
           <StatCard
             title="Total POS Sales"
             value={`₹${totalRevenue.toLocaleString('en-IN')}`}
-            subtitle={`${sales.length} completed transactions`}
+            subtitle={`${completedSales.length} completed transactions`}
             icon={BadgeIndianRupee}
             variant="success"
-            trend={{ value: '18% vs last cycle', isPositive: true }}
+            trend={{ value: 'Authoritative server ledger', isPositive: true }}
             onClick={() => setActiveTab('sales')}
+          />
+          <StatCard
+            title="Cash & UPI Collected"
+            value={`₹${totalCashCollected.toLocaleString('en-IN')}`}
+            subtitle="Immediate realized cashflow"
+            icon={ShoppingBag}
+            variant="success"
           />
           <StatCard
             title="Live Asset Value"
@@ -169,18 +194,11 @@ export const DashboardView: React.FC = () => {
             onClick={() => setActiveTab('finance')}
           />
           <StatCard
-            title="Unrealized Margin"
-            value={`₹${unrealizedProfit.toLocaleString('en-IN')}`}
-            subtitle={`${Math.round((unrealizedProfit / (totalTrueCostInvested || 1)) * 100)}% projected return`}
-            icon={TrendingUp}
-            variant="success"
-          />
-          <StatCard
-            title="Outstanding Credit"
-            value="₹76,700"
-            subtitle="2 traders with pending balance"
+            title="Outstanding Trader Credit"
+            value={`₹${totalOutstandingCredit.toLocaleString('en-IN')}`}
+            subtitle={`${overdueAlerts.length} overdue receivables`}
             icon={Users}
-            variant="warning"
+            variant={totalOverdueCredit > 0 ? 'danger' : 'warning'}
             onClick={() => setActiveTab('customers')}
           />
         </div>
@@ -202,7 +220,12 @@ export const DashboardView: React.FC = () => {
           <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-xs">
             <div className="text-[11px] font-semibold text-slate-500 uppercase">Active Goats</div>
             <div className="text-2xl font-bold text-slate-900 mt-1">{activeGoats.length}</div>
-            <div className="text-[11px] text-emerald-600 mt-1">100% capacity utilized</div>
+            <div className="text-[11px] text-emerald-600 mt-1">{pens.reduce((acc, p) => acc + p.currentCount, 0)} housed in pens</div>
+          </div>
+          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-xs">
+            <div className="text-[11px] font-semibold text-slate-500 uppercase">Goats Sold</div>
+            <div className="text-2xl font-bold text-emerald-800 mt-1">{soldGoatsCount}</div>
+            <div className="text-[11px] text-slate-500 mt-1">Certified off-take</div>
           </div>
           <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-xs">
             <div className="text-[11px] font-semibold text-slate-500 uppercase">Average Weight</div>
@@ -221,13 +244,8 @@ export const DashboardView: React.FC = () => {
           </div>
           <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-xs">
             <div className="text-[11px] font-semibold text-slate-500 uppercase">Mortality Rate</div>
-            <div className="text-2xl font-bold text-emerald-700 mt-1">0.0%</div>
+            <div className="text-2xl font-bold text-emerald-700 mt-1">{mortalityRate}%</div>
             <div className="text-[11px] text-emerald-600 mt-1">Zero losses in 90 days</div>
-          </div>
-          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-xs">
-            <div className="text-[11px] font-semibold text-slate-500 uppercase">Vaccine Coverage</div>
-            <div className="text-2xl font-bold text-emerald-700 mt-1">94%</div>
-            <div className="text-[11px] text-slate-500 mt-1">PPR & ET completed</div>
           </div>
         </div>
       </div>
@@ -241,18 +259,49 @@ export const DashboardView: React.FC = () => {
               Layer 3 — Actionable Farm Alerts & Critical Directives
             </h2>
           </div>
-          <span className="text-xs text-slate-500 font-medium">3 items require staff action</span>
+          <span className="text-xs text-slate-500 font-medium">Live alert stream</span>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          {/* Alert 1 */}
-          <div className="p-3.5 rounded-xl border border-rose-200 bg-rose-50/50 flex flex-col justify-between">
+          {/* Overdue Receivables Alert */}
+          {overdueAlerts.length > 0 && (
+            <div className="p-3.5 rounded-xl border border-rose-200 bg-rose-50/60 flex flex-col justify-between">
+              <div>
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-rose-200 text-rose-800 uppercase">
+                    Overdue Receivables
+                  </span>
+                  <span className="text-[10px] font-mono text-rose-700 font-bold">
+                    ₹{totalOverdueCredit.toLocaleString('en-IN')} Due
+                  </span>
+                </div>
+                <h3 className="font-semibold text-slate-900 text-xs mt-2">
+                  {overdueAlerts[0].customerName} ({overdueAlerts[0].businessName || 'Trader'})
+                </h3>
+                <p className="text-[11px] text-slate-600 mt-1">
+                  ₹{overdueAlerts[0].totalOverdue.toLocaleString('en-IN')} outstanding is {overdueAlerts[0].daysOverdue} days past payment terms ({overdueAlerts[0].oldestInvoiceNumber}).
+                </p>
+              </div>
+              <div className="mt-3 pt-2 border-t border-rose-200/60 flex items-center justify-between">
+                <span className="text-[10px] text-rose-700 font-medium">Ph: {overdueAlerts[0].phone}</span>
+                <button
+                  onClick={() => setQuickActionModal('RECORD_PAYMENT')}
+                  className="text-[11px] font-semibold text-rose-700 hover:text-rose-900 flex items-center gap-0.5"
+                >
+                  Collect Payment <ChevronRight className="h-3 w-3" />
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Alert 2: Quarantine / Vet */}
+          <div className="p-3.5 rounded-xl border border-amber-200 bg-amber-50/50 flex flex-col justify-between">
             <div>
               <div className="flex items-center justify-between">
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-rose-200 text-rose-800 uppercase">
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-amber-200 text-amber-900 uppercase">
                   Quarantine / Vet
                 </span>
-                <span className="text-[10px] text-rose-600">Pen Delta</span>
+                <span className="text-[10px] text-amber-800">Pen Delta</span>
               </div>
               <h3 className="font-semibold text-slate-900 text-xs mt-2">
                 Respiratory Antibiotic Protocol Active
@@ -261,28 +310,28 @@ export const DashboardView: React.FC = () => {
                 G-00253 requires Day 3 Oxytetracycline shot today by 11:00 AM.
               </p>
             </div>
-            <div className="mt-3 pt-2 border-t border-rose-200/60 flex items-center justify-between">
-              <span className="text-[10px] text-rose-700 font-medium">Assigned: Dr. Ramanathan</span>
+            <div className="mt-3 pt-2 border-t border-amber-200/60 flex items-center justify-between">
+              <span className="text-[10px] text-amber-800 font-medium">Assigned: Dr. Ramanathan</span>
               <button
                 onClick={() => {
                   setSelectedGoatId('goat-7');
                   setActiveTab('goats');
                 }}
-                className="text-[11px] font-semibold text-rose-700 hover:text-rose-900 flex items-center gap-0.5"
+                className="text-[11px] font-semibold text-amber-800 hover:text-amber-950 flex items-center gap-0.5"
               >
                 Inspect Goat <ChevronRight className="h-3 w-3" />
               </button>
             </div>
           </div>
 
-          {/* Alert 2 */}
-          <div className="p-3.5 rounded-xl border border-amber-200 bg-amber-50/50 flex flex-col justify-between">
+          {/* Alert 3: Feed Threshold */}
+          <div className="p-3.5 rounded-xl border border-sky-200 bg-sky-50/50 flex flex-col justify-between">
             <div>
               <div className="flex items-center justify-between">
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-amber-200 text-amber-900 uppercase">
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-sky-200 text-sky-900 uppercase">
                   Feed Threshold
                 </span>
-                <span className="text-[10px] text-amber-800">Critical Stock</span>
+                <span className="text-[10px] text-sky-800">Critical Stock</span>
               </div>
               <h3 className="font-semibold text-slate-900 text-xs mt-2">
                 Dry Fodder Bales Below Minimum
@@ -291,40 +340,13 @@ export const DashboardView: React.FC = () => {
                 Current: 240 kg. Minimum threshold is 500 kg. Reorder needed from cooperative.
               </p>
             </div>
-            <div className="mt-3 pt-2 border-t border-amber-200/60 flex items-center justify-between">
-              <span className="text-[10px] text-amber-800 font-medium">Est. 4 days remaining</span>
+            <div className="mt-3 pt-2 border-t border-sky-200/60 flex items-center justify-between">
+              <span className="text-[10px] text-sky-800 font-medium">Est. 4 days remaining</span>
               <button
                 onClick={() => setActiveTab('inventory')}
-                className="text-[11px] font-semibold text-amber-800 hover:text-amber-950 flex items-center gap-0.5"
-              >
-                Open Stock <ChevronRight className="h-3 w-3" />
-              </button>
-            </div>
-          </div>
-
-          {/* Alert 3 */}
-          <div className="p-3.5 rounded-xl border border-sky-200 bg-sky-50/50 flex flex-col justify-between">
-            <div>
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-sky-200 text-sky-900 uppercase">
-                  Scale Queue
-                </span>
-                <span className="text-[10px] text-sky-800">Pen Beta</span>
-              </div>
-              <h3 className="font-semibold text-slate-900 text-xs mt-2">
-                Weaner Group C Scheduled for Weigh-in
-              </h3>
-              <p className="text-[11px] text-slate-600 mt-1">
-                14 goats have completed 21 days since previous weight checkpoint.
-              </p>
-            </div>
-            <div className="mt-3 pt-2 border-t border-sky-200/60 flex items-center justify-between">
-              <span className="text-[10px] text-sky-800 font-medium">Due: 03:30 PM Today</span>
-              <button
-                onClick={() => setQuickActionModal('RECORD_WEIGHT')}
                 className="text-[11px] font-semibold text-sky-800 hover:text-sky-950 flex items-center gap-0.5"
               >
-                Open Scale <ChevronRight className="h-3 w-3" />
+                Open Stock <ChevronRight className="h-3 w-3" />
               </button>
             </div>
           </div>

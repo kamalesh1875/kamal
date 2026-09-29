@@ -36,12 +36,11 @@ export const Header: React.FC = () => {
   const lowStockItems = inventory.filter(i => i.currentStock <= i.minimumStockLevel);
   const alertCount = lowStockItems.length + 1; // 1 vaccine alert
 
-  const roles: { role: UserRole; title: string }[] = [
-    { role: 'OWNER', title: 'Farm Owner / Admin' },
-    { role: 'FARM_MANAGER', title: 'Farm Manager' },
-    { role: 'CASHIER', title: 'POS Cashier / Sales' },
-    { role: 'VETERINARIAN', title: 'Resident Vet / Health' },
-    { role: 'WORKER', title: 'Field Worker' }
+  const roles: { role: UserRole; title: string; email: string }[] = [
+    { role: 'OWNER', title: 'Farm Owner (Full Access)', email: 'admin@mskgoat.com' },
+    { role: 'VETERINARIAN', title: 'Resident Vet (Health & Weights)', email: 'vet@mskgoat.com' },
+    { role: 'WORKER', title: 'Field Worker (Weights & Tasks)', email: 'worker@mskgoat.com' },
+    { role: 'CASHIER', title: 'POS Cashier (Sales & Credit)', email: 'cashier@mskgoat.com' }
   ];
 
   return (

@@ -13,11 +13,14 @@ export const QuickActionModals: React.FC = () => {
     goats,
     pens,
     inventory,
+    customers,
+    sales,
     addGoat,
     recordWeight,
     issueFeed,
     addExpense,
-    addCustomer
+    addCustomer,
+    recordPayment
   } = useFarm();
 
   // Add Goat Form State
@@ -65,8 +68,15 @@ export const QuickActionModals: React.FC = () => {
   const [custCreditLimit, setCustCreditLimit] = useState<number>(50000);
   const [custAddress, setCustAddress] = useState('');
 
+  // Record Payment Form State
+  const [payCustId, setPayCustId] = useState(customers[0]?.id || '');
+  const [payAmount, setPayAmount] = useState<number>(10000);
+  const [payMethod, setPayMethod] = useState<'CASH' | 'UPI' | 'BANK_TRANSFER'>('UPI');
+  const [payNotes, setPayNotes] = useState('');
+
   const selectedWeightGoat = goats.find(g => g.id === weightGoatId);
   const selectedFeedItem = inventory.find(i => i.id === feedItemId);
+  const selectedPayCustomer = customers.find(c => c.id === payCustId);
 
   return (
     <>
@@ -562,6 +572,96 @@ export const QuickActionModals: React.FC = () => {
           <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
             <Button variant="outline" type="button" onClick={() => setQuickActionModal(null)}>Cancel</Button>
             <Button variant="primary" type="submit">Create Customer Profile</Button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* 6. RECORD CUSTOMER PAYMENT MODAL */}
+      <Modal
+        isOpen={quickActionModal === 'RECORD_PAYMENT'}
+        onClose={() => setQuickActionModal(null)}
+        title="Record Customer Payment & Settle Receivables"
+        subtitle="Credit ledger payout allocating funds across outstanding livestock invoices"
+        maxWidth="lg"
+      >
+        <form
+          onSubmit={e => {
+            e.preventDefault();
+            if (payCustId && payAmount > 0) {
+              recordPayment(payCustId, Number(payAmount), payMethod, payNotes);
+              setQuickActionModal(null);
+            }
+          }}
+          className="space-y-4 text-xs"
+        >
+          <div>
+            <label className="font-semibold text-slate-700 block mb-1">Select Customer / Trader *</label>
+            <select
+              value={payCustId}
+              onChange={e => setPayCustId(e.target.value)}
+              className="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-white font-medium focus:outline-none focus:border-[#1B4332]"
+            >
+              {customers.map(c => (
+                <option key={c.id} value={c.id}>
+                  {c.name} ({c.businessName || 'Trader'}) — Outstanding: ₹{c.outstandingBalance.toLocaleString('en-IN')}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {selectedPayCustomer && (
+            <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-1">
+              <div className="flex justify-between text-slate-600">
+                <span>Credit Limit:</span>
+                <span className="font-bold text-slate-900">₹{selectedPayCustomer.creditLimit.toLocaleString('en-IN')}</span>
+              </div>
+              <div className="flex justify-between text-slate-600">
+                <span>Current Outstanding:</span>
+                <span className="font-bold text-rose-700">₹{selectedPayCustomer.outstandingBalance.toLocaleString('en-IN')}</span>
+              </div>
+            </div>
+          )}
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="font-semibold text-slate-700 block mb-1">Payment Amount Received (₹) *</label>
+              <input
+                type="number"
+                required
+                min="1"
+                value={payAmount}
+                onChange={e => setPayAmount(parseFloat(e.target.value) || 0)}
+                className="w-full px-3 py-2 rounded-xl border border-slate-200 font-bold text-slate-900 focus:outline-none focus:border-[#1B4332]"
+              />
+            </div>
+            <div>
+              <label className="font-semibold text-slate-700 block mb-1">Payment Mode *</label>
+              <select
+                value={payMethod}
+                onChange={e => setPayMethod(e.target.value as any)}
+                className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white font-medium focus:outline-none focus:border-[#1B4332]"
+              >
+                <option value="UPI">UPI / GPay / PhonePe</option>
+                <option value="CASH">Cash Deposit</option>
+                <option value="BANK_TRANSFER">NEFT / RTGS Bank Transfer</option>
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <label className="font-semibold text-slate-700 block mb-1">Receipt Reference / Remarks</label>
+            <input
+              type="text"
+              placeholder="e.g. Santhai transaction / UPI ref 98214"
+              value={payNotes}
+              onChange={e => setPayNotes(e.target.value)}
+              className="w-full px-3 py-2 rounded-xl border border-slate-200 focus:outline-none focus:border-[#1B4332]"
+            />
+          </div>
+
+          <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+            <Button variant="outline" type="button" onClick={() => setQuickActionModal(null)}>Cancel</Button>
+            <Button variant="primary" type="submit">Record Payment Receipt</Button>
           </div>
         </form>
       </Modal>

@@ -24,7 +24,7 @@ import { Badge } from '@/components/ui/Badge';
 import { Modal } from '@/components/ui/Modal';
 
 export const PosView: React.FC = () => {
-  const { goats, customers, createSale, setActiveTab } = useFarm();
+  const { goats, customers, createSale, setActiveTab, currentRole } = useFarm();
 
   // POS State
   const [searchQuery, setSearchQuery] = useState('');
@@ -33,6 +33,7 @@ export const PosView: React.FC = () => {
   const [discountAmount, setDiscountAmount] = useState<number>(0);
   const [transportCharges, setTransportCharges] = useState<number>(0);
   const [paymentMethod, setPaymentMethod] = useState<'CASH' | 'UPI' | 'CREDIT' | 'SPLIT'>('CASH');
+  const [ownerOverrideCredit, setOwnerOverrideCredit] = useState(false);
   
   // Split payment state
   const [splitCash, setSplitCash] = useState<number>(0);
@@ -61,9 +62,19 @@ export const PosView: React.FC = () => {
   const subtotal = cart.reduce((acc, item) => acc + item.amount, 0);
   const totalAmount = Math.max(0, subtotal - discountAmount + transportCharges);
 
-  // Credit check
-  const availableCredit = currentCustomer ? Math.max(0, currentCustomer.creditLimit - currentCustomer.outstandingBalance) : 0;
-  const isCreditExceeded = paymentMethod === 'CREDIT' && totalAmount > availableCredit;
+  // Credit calculation & limit verification
+  const creditPortion =
+    paymentMethod === 'CREDIT'
+      ? totalAmount
+      : paymentMethod === 'SPLIT'
+      ? splitCredit
+      : 0;
+
+  const availableCredit = currentCustomer
+    ? Math.max(0, currentCustomer.creditLimit - currentCustomer.outstandingBalance)
+    : 0;
+
+  const isCreditExceeded = creditPortion > availableCredit;
 
   // Add goat to cart
   const addToCart = (goat: Goat) => {
@@ -502,13 +513,46 @@ export const PosView: React.FC = () => {
             )}
           </div>
 
+          {/* Credit Limit Alert Banner */}
+          {isCreditExceeded && (
+            <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-900 text-xs space-y-1.5">
+              <div className="flex items-start gap-2">
+                <AlertTriangle className="h-4 w-4 text-rose-600 shrink-0 mt-0.5" />
+                <div>
+                  <span className="font-bold block">Credit Limit Exceeded!</span>
+                  <p className="text-[11px] text-rose-800">
+                    Projected outstanding will exceed approved limit by <b>₹{(creditPortion - availableCredit).toLocaleString('en-IN')}</b> (Limit: ₹{currentCustomer?.creditLimit.toLocaleString('en-IN')}).
+                  </p>
+                </div>
+              </div>
+
+              {currentRole === 'OWNER' ? (
+                <label className="flex items-center gap-2 pt-1 border-t border-rose-200/60 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={ownerOverrideCredit}
+                    onChange={e => setOwnerOverrideCredit(e.target.checked)}
+                    className="rounded border-rose-300 text-emerald-700 h-4 w-4"
+                  />
+                  <span className="text-[11px] font-bold text-rose-900">
+                    Owner Override: Approve exceeding credit limit for this sale
+                  </span>
+                </label>
+              ) : (
+                <div className="text-[10px] text-rose-700 italic pt-1 border-t border-rose-200/60">
+                  Sale blocked for Cashier. Requires Farm Owner approval to proceed with credit.
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Action Trigger */}
           <div className="pt-2">
             <Button
               variant="accent"
               size="lg"
               className="w-full py-3 text-base font-bold shadow-md"
-              disabled={cart.length === 0}
+              disabled={cart.length === 0 || (isCreditExceeded && !ownerOverrideCredit && currentRole !== 'OWNER')}
               onClick={handleCompleteSale}
             >
               Complete Sale & Print Bill [F10]

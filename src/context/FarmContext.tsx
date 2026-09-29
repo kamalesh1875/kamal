@@ -27,6 +27,17 @@ import {
   INITIAL_AUDIT_LOGS
 } from '@/lib/mock-data';
 
+export interface OverdueAlert {
+  customerId: string;
+  customerName: string;
+  businessName?: string;
+  phone: string;
+  totalOverdue: number;
+  daysOverdue: number;
+  oldestInvoiceNumber: string;
+  severity: 'TODAY' | 'OVERDUE' | 'CRITICAL';
+}
+
 interface FarmContextType {
   // Current user role
   currentRole: UserRole;
@@ -43,6 +54,7 @@ interface FarmContextType {
   weightRecords: WeightRecord[];
   healthRecords: HealthRecord[];
   auditLogs: ActivityAuditLog[];
+  overdueAlerts: OverdueAlert[];
 
   // Selected goat for deep-dive economic profile
   selectedGoatId: string | null;
@@ -56,16 +68,22 @@ interface FarmContextType {
   isCommandMenuOpen: boolean;
   setIsCommandMenuOpen: (open: boolean) => void;
 
+  // Mobile Field Worker state
+  isMobileWorkerOpen: boolean;
+  setIsMobileWorkerOpen: (open: boolean) => void;
+
   // Quick Action Modal states
-  quickActionModal: 'ADD_GOAT' | 'POS_SALE' | 'RECORD_WEIGHT' | 'RECORD_EXPENSE' | 'ISSUE_FEED' | 'ADD_CUSTOMER' | null;
-  setQuickActionModal: (action: 'ADD_GOAT' | 'POS_SALE' | 'RECORD_WEIGHT' | 'RECORD_EXPENSE' | 'ISSUE_FEED' | 'ADD_CUSTOMER' | null) => void;
+  quickActionModal: 'ADD_GOAT' | 'POS_SALE' | 'RECORD_WEIGHT' | 'RECORD_EXPENSE' | 'ISSUE_FEED' | 'ADD_CUSTOMER' | 'RECORD_PAYMENT' | null;
+  setQuickActionModal: (action: 'ADD_GOAT' | 'POS_SALE' | 'RECORD_WEIGHT' | 'RECORD_EXPENSE' | 'ISSUE_FEED' | 'ADD_CUSTOMER' | 'RECORD_PAYMENT' | null) => void;
 
   // Mutation Handlers
   addGoat: (newGoat: Omit<Goat, 'id' | 'accumulatedFeedCost' | 'accumulatedMedicineCost' | 'accumulatedLaborCost' | 'accumulatedOverheadCost' | 'trueCost' | 'estimatedMarketValue' | 'projectedProfit'>) => Goat;
   updateGoat: (id: string, updates: Partial<Goat>) => void;
-  recordWeight: (goatId: string, weightKg: number, notes?: string) => void;
+  recordWeight: (goatId: string, weightKg: number, notes?: string) => { warning?: string };
   addHealthRecord: (record: Omit<HealthRecord, 'id'>) => void;
   createSale: (saleData: Omit<Sale, 'id' | 'invoiceNumber'>) => Sale;
+  cancelSale: (saleId: string, reason: string) => void;
+  recordPayment: (customerId: string, amount: number, paymentMethod: 'CASH' | 'UPI' | 'BANK_TRANSFER', notes?: string, allocations?: any[]) => void;
   addExpense: (expense: Omit<FarmExpense, 'id'>) => void;
   issueFeed: (itemId: string, quantityKg: number, penId: string, notes?: string) => void;
   addCustomer: (customer: Omit<Customer, 'id' | 'outstandingBalance' | 'totalPurchases'>) => Customer;
@@ -80,9 +98,10 @@ export const FarmProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [activeTab, setActiveTab] = useState<string>('dashboard');
   const [selectedGoatId, setSelectedGoatId] = useState<string | null>('goat-1');
   const [isCommandMenuOpen, setIsCommandMenuOpen] = useState(false);
-  const [quickActionModal, setQuickActionModal] = useState<'ADD_GOAT' | 'POS_SALE' | 'RECORD_WEIGHT' | 'RECORD_EXPENSE' | 'ISSUE_FEED' | 'ADD_CUSTOMER' | null>(null);
+  const [isMobileWorkerOpen, setIsMobileWorkerOpen] = useState(false);
+  const [quickActionModal, setQuickActionModal] = useState<'ADD_GOAT' | 'POS_SALE' | 'RECORD_WEIGHT' | 'RECORD_EXPENSE' | 'ISSUE_FEED' | 'ADD_CUSTOMER' | 'RECORD_PAYMENT' | null>(null);
 
-  // States with LocalStorage Hydration
+  // States with LocalStorage Hydration & Server Fallback
   const [goats, setGoats] = useState<Goat[]>(INITIAL_GOATS);
   const [pens, setPens] = useState<Pen[]>(INITIAL_PENS);
   const [customers, setCustomers] = useState<Customer[]>(INITIAL_CUSTOMERS);
@@ -93,8 +112,20 @@ export const FarmProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [weightRecords, setWeightRecords] = useState<WeightRecord[]>(INITIAL_WEIGHT_RECORDS);
   const [healthRecords, setHealthRecords] = useState<HealthRecord[]>(INITIAL_HEALTH_RECORDS);
   const [auditLogs, setAuditLogs] = useState<ActivityAuditLog[]>(INITIAL_AUDIT_LOGS);
+  const [overdueAlerts, setOverdueAlerts] = useState<OverdueAlert[]>([
+    {
+      customerId: 'cust-1',
+      customerName: 'Kumar',
+      businessName: 'Kumar Goat Traders & Livestock',
+      phone: '+91 98421 78910',
+      totalOverdue: 20000,
+      daysOverdue: 7,
+      oldestInvoiceNumber: 'INV-00482',
+      severity: 'OVERDUE'
+    }
+  ]);
 
-  // Load from local storage on mount
+  // Load from local storage or server on mount
   useEffect(() => {
     try {
       const savedGoats = localStorage.getItem('msk_goats');
@@ -111,6 +142,18 @@ export const FarmProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (savedWeights) setWeightRecords(JSON.parse(savedWeights));
       const savedHealth = localStorage.getItem('msk_health');
       if (savedHealth) setHealthRecords(JSON.parse(savedHealth));
+      const savedAudit = localStorage.getItem('msk_audit');
+      if (savedAudit) setAuditLogs(JSON.parse(savedAudit));
+
+      // Attempt background sync with live backend
+      fetch('/api/dashboard')
+        .then(res => res.json())
+        .then(data => {
+          if (data.alerts?.overdueAlerts) {
+            setOverdueAlerts(data.alerts.overdueAlerts);
+          }
+        })
+        .catch(() => {});
     } catch (e) {
       console.error('Failed to load local storage state', e);
     }
@@ -126,17 +169,19 @@ export const FarmProvider: React.FC<{ children: React.ReactNode }> = ({ children
       localStorage.setItem('msk_expenses', JSON.stringify(expenses));
       localStorage.setItem('msk_weights', JSON.stringify(weightRecords));
       localStorage.setItem('msk_health', JSON.stringify(healthRecords));
+      localStorage.setItem('msk_audit', JSON.stringify(auditLogs));
     } catch (e) {
       console.error('Failed to save to local storage', e);
     }
-  }, [goats, sales, inventory, customers, expenses, weightRecords, healthRecords]);
+  }, [goats, sales, inventory, customers, expenses, weightRecords, healthRecords, auditLogs]);
 
   // Log Audit Helper
   const logAudit = (action: string, details: string, module: ActivityAuditLog['module']) => {
+    const roleName = currentRole === 'OWNER' ? 'Admin (Kamalesh)' : currentRole === 'VETERINARIAN' ? 'Dr. Ramanathan (Vet)' : currentRole === 'CASHIER' ? 'Priya (Cashier)' : 'Muthu (Worker)';
     const newLog: ActivityAuditLog = {
-      id: `log-${Date.now()}`,
+      id: `log-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
       timestamp: new Date().toISOString().replace('T', ' ').substring(0, 16),
-      user: currentRole === 'OWNER' ? 'Admin (Kamalesh)' : `${currentRole.toLowerCase()}_user`,
+      user: roleName,
       role: currentRole,
       action,
       details,
@@ -147,8 +192,8 @@ export const FarmProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // Add Goat Handler
   const addGoat = (data: Omit<Goat, 'id' | 'accumulatedFeedCost' | 'accumulatedMedicineCost' | 'accumulatedLaborCost' | 'accumulatedOverheadCost' | 'trueCost' | 'estimatedMarketValue' | 'projectedProfit'>): Goat => {
-    const trueCost = data.purchasePrice;
-    const estimatedMarketValue = data.currentWeightKg * (data.marketRatePerKg || 450);
+    const trueCost = Number(data.purchasePrice || 0);
+    const estimatedMarketValue = Math.round(Number(data.currentWeightKg) * (data.marketRatePerKg || 460));
     const projectedProfit = estimatedMarketValue - trueCost;
 
     const newGoat: Goat = {
@@ -178,6 +223,14 @@ export const FarmProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setWeightRecords(prev => [...prev, initialWeightRecord]);
 
     logAudit('CREATE_GOAT', `Registered ${newGoat.breed} (${newGoat.tagNumber}, ${newGoat.currentWeightKg}kg) in ${newGoat.penId}`, 'LIVESTOCK');
+
+    // Sync to backend API
+    fetch('/api/goats', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    }).catch(() => {});
+
     return newGoat;
   };
 
@@ -185,28 +238,39 @@ export const FarmProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setGoats(prev => prev.map(g => {
       if (g.id !== id) return g;
       const updated = { ...g, ...updates };
-      updated.trueCost = updated.purchasePrice + updated.accumulatedFeedCost + updated.accumulatedMedicineCost + updated.accumulatedLaborCost + updated.accumulatedOverheadCost;
-      updated.estimatedMarketValue = updated.currentWeightKg * updated.marketRatePerKg;
+      updated.trueCost =
+        Number(updated.purchasePrice || 0) +
+        Number(updated.accumulatedFeedCost || 0) +
+        Number(updated.accumulatedMedicineCost || 0) +
+        Number(updated.accumulatedLaborCost || 0) +
+        Number(updated.accumulatedOverheadCost || 0);
+      updated.estimatedMarketValue = Math.round(Number(updated.currentWeightKg || 0) * (updated.marketRatePerKg || 460));
       updated.projectedProfit = updated.estimatedMarketValue - updated.trueCost;
       return updated;
     }));
   };
 
-  // Record Weight Handler with ADG calculation
-  const recordWeight = (goatId: string, weightKg: number, notes?: string) => {
+  // Record Weight Handler with ADG calculation and weight decrease observation
+  const recordWeight = (goatId: string, weightKg: number, notes?: string): { warning?: string } => {
     const goat = goats.find(g => g.id === goatId);
-    if (!goat) return;
+    if (!goat) return {};
 
     const previousWeights = weightRecords.filter(w => w.goatId === goatId).sort((a, b) => new Date(b.recordedAt).getTime() - new Date(a.recordedAt).getTime());
     const lastRecord = previousWeights[0];
     
     let adg = goat.adgGrams;
     const today = new Date().toISOString().substring(0, 10);
+    let warning: string | undefined = undefined;
 
     if (lastRecord) {
       const daysDiff = Math.max(1, Math.round((new Date(today).getTime() - new Date(lastRecord.recordedAt).getTime()) / (1000 * 60 * 60 * 24)));
       const weightDiffGrams = (weightKg - lastRecord.weightKg) * 1000;
       adg = Math.round(weightDiffGrams / daysDiff);
+
+      if (weightKg < lastRecord.weightKg) {
+        const dropKg = (lastRecord.weightKg - weightKg).toFixed(1);
+        warning = `Observation: Scale reading is ${dropKg}kg lower than previous measurement (${lastRecord.weightKg}kg). (Review scale, hydration, and nutrition. Does not automatically indicate illness).`;
+      }
     }
 
     const newRecord: WeightRecord = {
@@ -215,7 +279,7 @@ export const FarmProvider: React.FC<{ children: React.ReactNode }> = ({ children
       weightKg,
       recordedAt: today,
       adgGrams: adg,
-      notes: notes || 'Periodic weigh-in'
+      notes: notes || (warning ? warning : 'Periodic scale weigh-in')
     };
 
     setWeightRecords(prev => [...prev, newRecord]);
@@ -225,7 +289,16 @@ export const FarmProvider: React.FC<{ children: React.ReactNode }> = ({ children
       adgGrams: adg
     });
 
-    logAudit('UPDATE_WEIGHT', `Goat ${goat.tagNumber} weighed ${weightKg}kg (ADG: ${adg}g/day)`, 'LIVESTOCK');
+    logAudit('UPDATE_WEIGHT', `Goat ${goat.tagNumber} weighed ${weightKg}kg (ADG: ${adg > 0 ? '+' : ''}${adg}g/day). ${warning ? '[Drop observed]' : ''}`, 'LIVESTOCK');
+
+    // Sync to backend API
+    fetch('/api/weights', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ goatId, weightKg, notes })
+    }).catch(() => {});
+
+    return { warning };
   };
 
   // Add Health Record
@@ -249,7 +322,7 @@ export const FarmProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // Create POS Sale
   const createSale = (saleData: Omit<Sale, 'id' | 'invoiceNumber'>): Sale => {
-    const invoiceNumber = `INV-${String(sales.length + 483).padStart(5, '0')}`;
+    const invoiceNumber = `INV-${new Date().getFullYear()}-${String(sales.length + 1043).padStart(5, '0')}`;
     const newSale: Sale = {
       ...saleData,
       id: `sale-${Date.now()}`,
@@ -265,12 +338,12 @@ export const FarmProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     // If payment involves credit, update customer outstanding balance
     const creditAmount = newSale.paymentBreakdown?.credit || (newSale.paymentStatus === 'CREDIT' ? newSale.totalAmount : (newSale.totalAmount - newSale.paidAmount));
-    if (creditAmount > 0 && newSale.customerId) {
+    if (newSale.customerId) {
       setCustomers(prev => prev.map(c => {
         if (c.id === newSale.customerId) {
           return {
             ...c,
-            outstandingBalance: c.outstandingBalance + creditAmount,
+            outstandingBalance: c.outstandingBalance + (creditAmount > 0 ? creditAmount : 0),
             totalPurchases: c.totalPurchases + newSale.totalAmount
           };
         }
@@ -278,8 +351,99 @@ export const FarmProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }));
     }
 
-    logAudit('POS_SALE', `Invoice ${invoiceNumber} created for ${newSale.customerName} (₹${newSale.totalAmount}) - ${newSale.items.length} goats`, 'POS');
+    logAudit('POS_SALE', `Invoice ${invoiceNumber} created for ${newSale.customerName} (₹${newSale.totalAmount.toLocaleString('en-IN')}) - ${newSale.items.length} goats`, 'POS');
+
+    // Sync to backend API
+    fetch('/api/pos/sales', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        customerId: newSale.customerId,
+        items: newSale.items.map(i => ({ goatId: i.goatId, ratePerKg: i.ratePerKg })),
+        discount: newSale.discount,
+        transportCharges: newSale.transportCharges,
+        paymentMethod: newSale.paymentMethod,
+        paymentBreakdown: newSale.paymentBreakdown,
+        notes: newSale.notes
+      })
+    }).catch(() => {});
+
     return newSale;
+  };
+
+  // Cancel / Void Sale (Never delete completed financial transactions)
+  const cancelSale = (saleId: string, reason: string) => {
+    const sale = sales.find(s => s.id === saleId);
+    if (!sale) return;
+
+    setSales(prev => prev.map(s => {
+      if (s.id !== saleId) return s;
+      return {
+        ...s,
+        status: 'CANCELLED',
+        notes: `${s.notes || ''} [CANCELLED: ${reason}]`
+      };
+    }));
+
+    // Revert sold goats to ACTIVE
+    sale.items.forEach(item => {
+      updateGoat(item.goatId, { status: 'ACTIVE' });
+    });
+
+    // Revert customer outstanding balance
+    if (sale.customerId) {
+      const creditToRevert = sale.totalAmount - sale.paidAmount;
+      setCustomers(prev => prev.map(c => {
+        if (c.id === sale.customerId) {
+          return {
+            ...c,
+            outstandingBalance: Math.max(0, c.outstandingBalance - creditToRevert),
+            totalPurchases: Math.max(0, c.totalPurchases - sale.totalAmount)
+          };
+        }
+        return c;
+      }));
+    }
+
+    logAudit('CANCEL_SALE', `Invoice ${sale.invoiceNumber} CANCELLED. Reason: ${reason}. Goats returned to active herd.`, 'POS');
+
+    // Sync to backend API
+    fetch(`/api/pos/sales/${saleId}/cancel`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reason })
+    }).catch(() => {});
+  };
+
+  // Record Customer Payment & Allocation
+  const recordPayment = (
+    customerId: string,
+    amount: number,
+    paymentMethod: 'CASH' | 'UPI' | 'BANK_TRANSFER',
+    notes?: string,
+    allocations?: any[]
+  ) => {
+    const customer = customers.find(c => c.id === customerId);
+    if (!customer) return;
+
+    setCustomers(prev => prev.map(c => {
+      if (c.id === customerId) {
+        return {
+          ...c,
+          outstandingBalance: Math.max(0, c.outstandingBalance - amount)
+        };
+      }
+      return c;
+    }));
+
+    logAudit('RECORD_PAYMENT', `Payment of ₹${amount.toLocaleString('en-IN')} received from ${customer.name} via ${paymentMethod}`, 'FINANCE');
+
+    // Sync to backend API
+    fetch('/api/payments', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ customerId, amount, paymentMethod, notes, allocations })
+    }).catch(() => {});
   };
 
   // Add Expense
@@ -332,6 +496,13 @@ export const FarmProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
     setCustomers(prev => [...prev, newCustomer]);
     logAudit('NEW_CUSTOMER', `Created customer profile: ${newCustomer.name} (${newCustomer.businessName})`, 'POS');
+
+    fetch('/api/customers', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(customer)
+    }).catch(() => {});
+
     return newCustomer;
   };
 
@@ -375,12 +546,15 @@ export const FarmProvider: React.FC<{ children: React.ReactNode }> = ({ children
         weightRecords,
         healthRecords,
         auditLogs,
+        overdueAlerts,
         selectedGoatId,
         setSelectedGoatId,
         activeTab,
         setActiveTab,
         isCommandMenuOpen,
         setIsCommandMenuOpen,
+        isMobileWorkerOpen,
+        setIsMobileWorkerOpen,
         quickActionModal,
         setQuickActionModal,
         addGoat,
@@ -388,6 +562,8 @@ export const FarmProvider: React.FC<{ children: React.ReactNode }> = ({ children
         recordWeight,
         addHealthRecord,
         createSale,
+        cancelSale,
+        recordPayment,
         addExpense,
         issueFeed,
         addCustomer,

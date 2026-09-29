@@ -1,4 +1,4 @@
-export type GoatStatus = 'ACTIVE' | 'SOLD' | 'QUARANTINE' | 'DECEASED' | 'PREGNANT';
+export type GoatStatus = 'ACTIVE' | 'SOLD' | 'QUARANTINE' | 'QUARANTINED' | 'DECEASED' | 'DEAD' | 'TRANSFERRED' | 'PREGNANT';
 export type Gender = 'MALE' | 'FEMALE';
 export type UserRole = 'OWNER' | 'ADMIN' | 'FARM_MANAGER' | 'ACCOUNTANT' | 'VETERINARIAN' | 'WORKER' | 'CASHIER';
 
@@ -183,5 +183,5 @@ export interface ActivityAuditLog {
   role: UserRole;
   action: string;
   details: string;
-  module: 'LIVESTOCK' | 'POS' | 'FINANCE' | 'INVENTORY' | 'HEALTH';
+  module: 'LIVESTOCK' | 'POS' | 'FINANCE' | 'INVENTORY' | 'HEALTH' | 'AUTH' | 'SETTINGS';
 }
