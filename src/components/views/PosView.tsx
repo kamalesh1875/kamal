@@ -140,7 +140,7 @@ export const PosView: React.FC = () => {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  });
+  }, [cart, discountAmount, currentCustomer, totalAmount, paymentMethod, splitCash, splitUpi, splitCredit, transportCharges]);
 
   const handleCompleteSale = () => {
     if (cart.length === 0) return;

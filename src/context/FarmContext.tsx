@@ -159,20 +159,24 @@ export const FarmProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, []);
 
-  // Save changes
+  // Debounced save changes to prevent UI lag on frequent mutations
   useEffect(() => {
-    try {
-      localStorage.setItem('msk_goats', JSON.stringify(goats));
-      localStorage.setItem('msk_sales', JSON.stringify(sales));
-      localStorage.setItem('msk_inventory', JSON.stringify(inventory));
-      localStorage.setItem('msk_customers', JSON.stringify(customers));
-      localStorage.setItem('msk_expenses', JSON.stringify(expenses));
-      localStorage.setItem('msk_weights', JSON.stringify(weightRecords));
-      localStorage.setItem('msk_health', JSON.stringify(healthRecords));
-      localStorage.setItem('msk_audit', JSON.stringify(auditLogs));
-    } catch (e) {
-      console.error('Failed to save to local storage', e);
-    }
+    const timer = setTimeout(() => {
+      try {
+        localStorage.setItem('msk_goats', JSON.stringify(goats));
+        localStorage.setItem('msk_sales', JSON.stringify(sales));
+        localStorage.setItem('msk_inventory', JSON.stringify(inventory));
+        localStorage.setItem('msk_customers', JSON.stringify(customers));
+        localStorage.setItem('msk_expenses', JSON.stringify(expenses));
+        localStorage.setItem('msk_weights', JSON.stringify(weightRecords));
+        localStorage.setItem('msk_health', JSON.stringify(healthRecords));
+        localStorage.setItem('msk_audit', JSON.stringify(auditLogs));
+      } catch (e) {
+        console.error('Failed to save to local storage', e);
+      }
+    }, 250);
+
+    return () => clearTimeout(timer);
   }, [goats, sales, inventory, customers, expenses, weightRecords, healthRecords, auditLogs]);
 
   // Log Audit Helper

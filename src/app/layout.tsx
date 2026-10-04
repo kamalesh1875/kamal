@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 
@@ -7,9 +7,23 @@ const inter = Inter({
   variable: "--font-inter",
 });
 
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+  viewportFit: "cover",
+  themeColor: "#1B4332",
+};
+
 export const metadata: Metadata = {
   title: "GoatFarm OS — MSK Commercial Livestock ERP + POS",
   description: "Enterprise livestock management, growth tracking, true cost accounting, and fast POS invoicing platform.",
+  manifest: "/manifest.json",
+  icons: {
+    icon: "/icon.svg",
+    apple: "/icon.svg"
+  }
 };
 
 export default function RootLayout({

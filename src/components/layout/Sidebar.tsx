@@ -55,6 +55,7 @@ export const Sidebar: React.FC = () => {
         { id: 'goats', label: 'Goats Registry', icon: ShieldAlert },
         { id: 'weight', label: 'Weight & ADG', icon: Scale },
         { id: 'health', label: 'Health & Vaccines', icon: Activity, badge: overdueVaccinesCount > 0 ? `${overdueVaccinesCount} due` : undefined, badgeVariant: 'danger' as const },
+        { id: 'ai-health', label: 'AI Health Center', icon: Sparkles, isHighlight: true },
         { id: 'pens', label: 'Pen Management', icon: Grid }
       ]
     },

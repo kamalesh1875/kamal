@@ -1,0 +1,18 @@
+{
+  "name": "MSK GoatFarm OS — Livestock ERP & Field System",
+  "short_name": "GoatFarm OS",
+  "description": "Commercial Feedlot Operating System, Rapid POS, Animal Health AI & Field Worker Tool",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#11291F",
+  "theme_color": "#1B4332",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

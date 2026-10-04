@@ -73,7 +73,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, RolePermissions> = {
     canIssueFeed: true,
     canCancelSales: true,
     canViewAuditLogs: true,
-    allowedNavTabs: ['dashboard', 'goats', 'weight', 'health', 'pens', 'pos', 'sales', 'customers', 'inventory', 'tasks', 'finance', 'expenses', 'audit']
+    allowedNavTabs: ['dashboard', 'goats', 'weight', 'health', 'ai-health', 'pens', 'pos', 'sales', 'customers', 'inventory', 'tasks', 'finance', 'expenses', 'audit']
   },
   ADMIN: {
     canViewProfit: true,
@@ -86,7 +86,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, RolePermissions> = {
     canIssueFeed: true,
     canCancelSales: true,
     canViewAuditLogs: true,
-    allowedNavTabs: ['dashboard', 'goats', 'weight', 'health', 'pens', 'pos', 'sales', 'customers', 'inventory', 'tasks', 'finance', 'expenses', 'audit']
+    allowedNavTabs: ['dashboard', 'goats', 'weight', 'health', 'ai-health', 'pens', 'pos', 'sales', 'customers', 'inventory', 'tasks', 'finance', 'expenses', 'audit']
   },
   FARM_MANAGER: {
     canViewProfit: false,
@@ -99,7 +99,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, RolePermissions> = {
     canIssueFeed: true,
     canCancelSales: false,
     canViewAuditLogs: true,
-    allowedNavTabs: ['dashboard', 'goats', 'weight', 'health', 'pens', 'pos', 'sales', 'customers', 'inventory', 'tasks', 'expenses', 'audit']
+    allowedNavTabs: ['dashboard', 'goats', 'weight', 'health', 'ai-health', 'pens', 'pos', 'sales', 'customers', 'inventory', 'tasks', 'expenses', 'audit']
   },
   ACCOUNTANT: {
     canViewProfit: true,
@@ -125,7 +125,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, RolePermissions> = {
     canIssueFeed: true,
     canCancelSales: false,
     canViewAuditLogs: false,
-    allowedNavTabs: ['dashboard', 'goats', 'weight', 'health', 'pens', 'tasks']
+    allowedNavTabs: ['dashboard', 'goats', 'weight', 'health', 'ai-health', 'pens', 'tasks']
   },
   WORKER: {
     canViewProfit: false,
