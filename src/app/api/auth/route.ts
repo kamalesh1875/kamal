@@ -9,7 +9,12 @@ export async function POST(req: NextRequest) {
 
     if (action === 'logout') {
       const response = NextResponse.json({ success: true, message: 'Logged out successfully' });
-      response.cookies.delete('goatfarm_session');
+      response.cookies.set('goatfarm_session', '', {
+        path: '/',
+        maxAge: 0,
+        httpOnly: true,
+        sameSite: 'lax'
+      });
       return response;
     }
 
@@ -20,7 +25,7 @@ export async function POST(req: NextRequest) {
 
     const user = SEED_USERS[email.toLowerCase().trim()];
     if (!user || user.password !== password) {
-      return NextResponse.json({ error: 'Invalid credentials. Use provided test accounts.' }, { status: 401 });
+      return NextResponse.json({ error: 'Invalid email or password.' }, { status: 401 });
     }
 
     const authUser: AuthUser = {
@@ -75,3 +80,15 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ user: null });
   }
 }
+
+export async function DELETE(req: NextRequest) {
+  const response = NextResponse.json({ success: true, message: 'Logged out successfully' });
+  response.cookies.set('goatfarm_session', '', {
+    path: '/',
+    maxAge: 0,
+    httpOnly: true,
+    sameSite: 'lax'
+  });
+  return response;
+}
+

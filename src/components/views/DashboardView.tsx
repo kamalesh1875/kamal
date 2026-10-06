@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import { useRouter } from 'next/navigation';
 import {
   BadgeIndianRupee,
   Scale,
@@ -17,7 +18,7 @@ import {
   ChevronRight,
   Smartphone
 } from 'lucide-react';
-import { useFarm } from '@/context/FarmContext';
+import { useFarm, useAuth } from '@/context/FarmContext';
 import { StatCard } from '@/components/ui/StatCard';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
@@ -34,6 +35,7 @@ import {
 } from 'recharts';
 
 export const DashboardView: React.FC = () => {
+  const router = useRouter();
   const {
     goats,
     pens,
@@ -47,8 +49,10 @@ export const DashboardView: React.FC = () => {
     setActiveTab,
     setQuickActionModal,
     setSelectedGoatId,
-    setIsMobileWorkerOpen
+    setIsMobileWorkerOpen,
+    toggleTaskStatus
   } = useFarm();
+  const { permissions } = useAuth();
 
   // Layer 1: Business Health calculations
   const completedSales = sales.filter(s => s.status !== 'CANCELLED');
@@ -120,18 +124,23 @@ export const DashboardView: React.FC = () => {
           </div>
 
           <div className="flex flex-wrap items-center gap-2.5">
-            <Button
-              variant="accent"
-              size="md"
-              icon={ShoppingBag}
-              onClick={() => setActiveTab('pos')}
-            >
-              Launch POS Screen
-            </Button>
+            {permissions?.canAccessPos && (
+              <Button
+                variant="accent"
+                size="md"
+                icon={ShoppingBag}
+                onClick={() => {
+                  setActiveTab('pos');
+                  router.push('/pos');
+                }}
+              >
+                Launch POS Screen
+              </Button>
+            )}
             <Button
               variant="outline"
               size="md"
-              className="bg-white/10 text-white border-white/20 hover:bg-white/20"
+              className="bg-white/10 text-white border-white/20 hover:bg-white/20 cursor-pointer"
               icon={Smartphone}
               onClick={() => setIsMobileWorkerOpen(true)}
             >
@@ -140,7 +149,7 @@ export const DashboardView: React.FC = () => {
             <Button
               variant="outline"
               size="md"
-              className="bg-white/10 text-white border-white/20 hover:bg-white/20"
+              className="bg-white/10 text-white border-white/20 hover:bg-white/20 cursor-pointer"
               onClick={() => setQuickActionModal('ADD_GOAT')}
             >
               + Register Goat
@@ -162,45 +171,99 @@ export const DashboardView: React.FC = () => {
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5">
-          <StatCard
-            title="Total POS Sales"
-            value={`₹${totalRevenue.toLocaleString('en-IN')}`}
-            subtitle={`${completedSales.length} completed transactions`}
-            icon={BadgeIndianRupee}
-            variant="success"
-            trend={{ value: 'Authoritative server ledger', isPositive: true }}
-            onClick={() => setActiveTab('sales')}
-          />
-          <StatCard
-            title="Cash & UPI Collected"
-            value={`₹${totalCashCollected.toLocaleString('en-IN')}`}
-            subtitle="Immediate realized cashflow"
-            icon={ShoppingBag}
-            variant="success"
-          />
+          {permissions?.canViewProfit ? (
+            <StatCard
+              title="Total POS Sales"
+              value={`₹${totalRevenue.toLocaleString('en-IN')}`}
+              subtitle={`${completedSales.length} completed transactions`}
+              icon={BadgeIndianRupee}
+              variant="success"
+              trend={{ value: 'Authoritative server ledger', isPositive: true }}
+              onClick={() => {
+                if (permissions?.canAccessPos) {
+                  setActiveTab('sales');
+                  router.push('/sales');
+                }
+              }}
+            />
+          ) : (
+            <StatCard
+              title="Commercial Sales"
+              value="Restricted"
+              subtitle="Manager / Owner privilege"
+              icon={BadgeIndianRupee}
+            />
+          )}
+
+          {permissions?.canViewProfit ? (
+            <StatCard
+              title="Cash & UPI Collected"
+              value={`₹${totalCashCollected.toLocaleString('en-IN')}`}
+              subtitle="Immediate realized cashflow"
+              icon={ShoppingBag}
+              variant="success"
+            />
+          ) : (
+            <StatCard
+              title="Cash Collections"
+              value="Restricted"
+              subtitle="Finance department view"
+              icon={ShoppingBag}
+            />
+          )}
+
           <StatCard
             title="Live Asset Value"
-            value={`₹${totalLivestockAssetValue.toLocaleString('en-IN')}`}
-            subtitle={`${totalBiomassKg} kg current biomass`}
+            value={permissions?.canViewProfit ? `₹${totalLivestockAssetValue.toLocaleString('en-IN')}` : `${totalBiomassKg} kg Biomass`}
+            subtitle={permissions?.canViewProfit ? `${totalBiomassKg} kg current biomass` : `${activeGoats.length} living goats`}
             icon={Scale}
-            trend={{ value: 'Market @ ₹450-490/kg', isPositive: true }}
-            onClick={() => setActiveTab('goats')}
+            trend={permissions?.canViewProfit ? { value: 'Market @ ₹450-490/kg', isPositive: true } : undefined}
+            onClick={() => {
+              setActiveTab('goats');
+              router.push('/goats');
+            }}
           />
-          <StatCard
-            title="Cumulative True Cost"
-            value={`₹${totalTrueCostInvested.toLocaleString('en-IN')}`}
-            subtitle="Purchase + Feed + Meds + Labor"
-            icon={Activity}
-            onClick={() => setActiveTab('finance')}
-          />
-          <StatCard
-            title="Outstanding Trader Credit"
-            value={`₹${totalOutstandingCredit.toLocaleString('en-IN')}`}
-            subtitle={`${overdueAlerts.length} overdue receivables`}
-            icon={Users}
-            variant={totalOverdueCredit > 0 ? 'danger' : 'warning'}
-            onClick={() => setActiveTab('customers')}
-          />
+
+          {permissions?.canViewFinance ? (
+            <StatCard
+              title="Cumulative True Cost"
+              value={`₹${totalTrueCostInvested.toLocaleString('en-IN')}`}
+              subtitle="Purchase + Feed + Meds + Labor"
+              icon={Activity}
+              onClick={() => {
+                setActiveTab('finance');
+                router.push('/finance');
+              }}
+            />
+          ) : (
+            <StatCard
+              title="True Cost Invested"
+              value="Audited Ledger"
+              subtitle="Restricted • Admin privilege"
+              icon={Activity}
+            />
+          )}
+
+          {permissions?.canAccessCustomerCredit ? (
+            <StatCard
+              title="Outstanding Trader Credit"
+              value={`₹${totalOutstandingCredit.toLocaleString('en-IN')}`}
+              subtitle={`${overdueAlerts.length} overdue receivables`}
+              icon={Users}
+              variant={totalOverdueCredit > 0 ? 'danger' : 'warning'}
+              onClick={() => {
+                setActiveTab('customers');
+                router.push('/customers');
+              }}
+            />
+          ) : (
+            <StatCard
+              title="Trader Credit"
+              value="Restricted"
+              subtitle="Accounts receivable view"
+              icon={Users}
+            />
+          )}
         </div>
       </div>
 
@@ -316,8 +379,9 @@ export const DashboardView: React.FC = () => {
                 onClick={() => {
                   setSelectedGoatId('goat-7');
                   setActiveTab('goats');
+                  router.push('/goats');
                 }}
-                className="text-[11px] font-semibold text-amber-800 hover:text-amber-950 flex items-center gap-0.5"
+                className="text-[11px] font-semibold text-amber-800 hover:text-amber-950 flex items-center gap-0.5 cursor-pointer"
               >
                 Inspect Goat <ChevronRight className="h-3 w-3" />
               </button>
@@ -343,8 +407,11 @@ export const DashboardView: React.FC = () => {
             <div className="mt-3 pt-2 border-t border-sky-200/60 flex items-center justify-between">
               <span className="text-[10px] text-sky-800 font-medium">Est. 4 days remaining</span>
               <button
-                onClick={() => setActiveTab('inventory')}
-                className="text-[11px] font-semibold text-sky-800 hover:text-sky-950 flex items-center gap-0.5"
+                onClick={() => {
+                  setActiveTab('inventory');
+                  router.push('/inventory');
+                }}
+                className="text-[11px] font-semibold text-sky-800 hover:text-sky-950 flex items-center gap-0.5 cursor-pointer"
               >
                 Open Stock <ChevronRight className="h-3 w-3" />
               </button>
@@ -445,8 +512,8 @@ export const DashboardView: React.FC = () => {
                 <input
                   type="checkbox"
                   checked={task.status === 'COMPLETED'}
-                  onChange={() => {}}
-                  className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 h-4 w-4"
+                  onChange={() => toggleTaskStatus(task.id)}
+                  className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 h-4 w-4 cursor-pointer"
                 />
                 <div>
                   <span className={`font-semibold ${task.status === 'COMPLETED' ? 'line-through text-slate-400' : 'text-slate-900'}`}>

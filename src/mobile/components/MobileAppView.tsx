@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useState } from 'react';
-import { useFarm } from '@/context/FarmContext';
+import { LogOut } from 'lucide-react';
+import { useFarm, useAuth } from '@/context/FarmContext';
 import { MobileNavigation, MobileTab } from './MobileNavigation';
 import { MobileDashboard } from './MobileDashboard';
 import { MobileGoatView } from './MobileGoatView';
@@ -25,6 +26,7 @@ interface MobileAppViewProps {
 
 export const MobileAppView: React.FC<MobileAppViewProps> = ({ onSwitchToDesktop }) => {
   const { setQuickActionModal } = useFarm();
+  const { user, role: currentRole, logout } = useAuth();
   const [currentTab, setCurrentTab] = useState<MobileTab>('home');
   const [inspectingGoatId, setInspectingGoatId] = useState<string | null>(null);
   const [isScannerOpen, setIsScannerOpen] = useState(false);
@@ -135,8 +137,12 @@ export const MobileAppView: React.FC<MobileAppViewProps> = ({ onSwitchToDesktop 
             🐐
           </div>
           <div>
-            <div className="font-bold text-xs tracking-tight">MSK GoatFarm OS</div>
-            <div className="text-[10px] text-emerald-400/80">Worker Field Edition</div>
+            <div className="font-bold text-xs tracking-tight truncate max-w-[130px]">
+              {user?.name || 'MSK GoatFarm OS'}
+            </div>
+            <div className="text-[10px] text-emerald-400/80 font-mono">
+              {currentRole}
+            </div>
           </div>
         </div>
 
@@ -144,11 +150,20 @@ export const MobileAppView: React.FC<MobileAppViewProps> = ({ onSwitchToDesktop 
           {onSwitchToDesktop && (
             <button
               onClick={onSwitchToDesktop}
-              className="text-[10px] bg-white/10 hover:bg-white/20 text-slate-200 px-2 py-1 rounded-lg border border-white/10"
+              className="text-[10px] bg-white/10 hover:bg-white/20 text-slate-200 px-2 py-1 rounded-lg border border-white/10 cursor-pointer"
             >
               Desktop
             </button>
           )}
+
+          <button
+            onClick={() => logout()}
+            title="Sign out of account"
+            aria-label="Sign out of account"
+            className="p-1 rounded-lg bg-rose-950/40 hover:bg-rose-900/60 text-rose-300 border border-rose-500/20 transition-colors cursor-pointer"
+          >
+            <LogOut className="h-3.5 w-3.5" />
+          </button>
         </div>
       </header>
 

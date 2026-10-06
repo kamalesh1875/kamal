@@ -16,7 +16,7 @@ import {
   Clock,
   Users
 } from 'lucide-react';
-import { useFarm } from '@/context/FarmContext';
+import { useFarm, useAuth } from '@/context/FarmContext';
 import { MobileTab } from './MobileNavigation';
 
 interface MobileDashboardProps {
@@ -38,6 +38,7 @@ export const MobileDashboard: React.FC<MobileDashboardProps> = ({
     overdueAlerts,
     currentRole
   } = useFarm();
+  const { permissions } = useAuth();
 
   // Today's Date String (YYYY-MM-DD)
   const todayStr = new Date().toISOString().substring(0, 10);
@@ -241,16 +242,26 @@ export const MobileDashboard: React.FC<MobileDashboardProps> = ({
 
       {/* Quick Launch Buttons for Farm Hand */}
       <div className="grid grid-cols-2 gap-2.5 pt-1">
-        <button
-          onClick={() => onNavigate('pos')}
-          className="flex items-center justify-center gap-2 p-3 rounded-2xl bg-[#1B4332] text-white font-bold text-xs shadow-xs"
-        >
-          <ShoppingBag className="h-4 w-4" />
-          <span>Goat POS Invoicing</span>
-        </button>
+        {permissions?.canAccessPos ? (
+          <button
+            onClick={() => onNavigate('pos')}
+            className="flex items-center justify-center gap-2 p-3 rounded-2xl bg-[#1B4332] text-white font-bold text-xs shadow-xs cursor-pointer"
+          >
+            <ShoppingBag className="h-4 w-4" />
+            <span>Goat POS Invoicing</span>
+          </button>
+        ) : (
+          <button
+            onClick={() => onNavigate('health')}
+            className="flex items-center justify-center gap-2 p-3 rounded-2xl bg-[#1B4332] text-white font-bold text-xs shadow-xs cursor-pointer"
+          >
+            <Activity className="h-4 w-4" />
+            <span>Health & Vaccines</span>
+          </button>
+        )}
         <button
           onClick={() => onNavigate('weight')}
-          className="flex items-center justify-center gap-2 p-3 rounded-2xl bg-slate-900 text-white font-bold text-xs shadow-xs"
+          className="flex items-center justify-center gap-2 p-3 rounded-2xl bg-slate-900 text-white font-bold text-xs shadow-xs cursor-pointer"
         >
           <Scale className="h-4 w-4 text-emerald-400" />
           <span>Rapid Weight Scale</span>

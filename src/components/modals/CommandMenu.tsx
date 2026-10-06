@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import {
   Search,
   Plus,
@@ -13,9 +14,10 @@ import {
   ArrowRight,
   X
 } from 'lucide-react';
-import { useFarm } from '@/context/FarmContext';
+import { useFarm, useAuth } from '@/context/FarmContext';
 
 export const CommandMenu: React.FC = () => {
+  const router = useRouter();
   const {
     isCommandMenuOpen,
     setIsCommandMenuOpen,
@@ -26,6 +28,7 @@ export const CommandMenu: React.FC = () => {
     setSelectedGoatId,
     setQuickActionModal
   } = useFarm();
+  const { permissions, role } = useAuth();
 
   const [query, setQuery] = useState('');
 
@@ -62,15 +65,23 @@ export const CommandMenu: React.FC = () => {
   const handleSelectGoat = (goatId: string) => {
     setSelectedGoatId(goatId);
     setActiveTab('goats');
+    router.push('/goats');
     setIsCommandMenuOpen(false);
   };
 
   const handleSelectCustomer = () => {
     setActiveTab('customers');
+    router.push('/customers');
     setIsCommandMenuOpen(false);
   };
 
   const handleAction = (action: 'ADD_GOAT' | 'POS_SALE' | 'RECORD_WEIGHT' | 'RECORD_EXPENSE' | 'ISSUE_FEED') => {
+    if (action === 'POS_SALE') {
+      setActiveTab('pos');
+      router.push('/pos');
+      setIsCommandMenuOpen(false);
+      return;
+    }
     setQuickActionModal(action);
     setIsCommandMenuOpen(false);
   };
@@ -112,57 +123,65 @@ export const CommandMenu: React.FC = () => {
               Quick Actions
             </div>
             <div className="grid grid-cols-2 gap-1.5">
-              <button
-                onClick={() => handleAction('POS_SALE')}
-                className="flex items-center gap-2 p-2 rounded-xl text-left hover:bg-amber-50 hover:text-amber-900 border border-transparent hover:border-amber-200 transition-colors"
-              >
-                <div className="h-6 w-6 rounded-lg bg-amber-100 text-amber-800 flex items-center justify-center">
-                  <ShoppingBag className="h-3.5 w-3.5" />
-                </div>
-                <div>
-                  <span className="font-semibold block text-slate-900">New POS Sale</span>
-                  <span className="text-[10px] text-slate-400">Launch checkout terminal</span>
-                </div>
-              </button>
+              {permissions?.canAccessPos && (
+                <button
+                  onClick={() => handleAction('POS_SALE')}
+                  className="flex items-center gap-2 p-2 rounded-xl text-left hover:bg-amber-50 hover:text-amber-900 border border-transparent hover:border-amber-200 transition-colors cursor-pointer"
+                >
+                  <div className="h-6 w-6 rounded-lg bg-amber-100 text-amber-800 flex items-center justify-center">
+                    <ShoppingBag className="h-3.5 w-3.5" />
+                  </div>
+                  <div>
+                    <span className="font-semibold block text-slate-900">New POS Sale</span>
+                    <span className="text-[10px] text-slate-400">Launch checkout terminal</span>
+                  </div>
+                </button>
+              )}
 
-              <button
-                onClick={() => handleAction('ADD_GOAT')}
-                className="flex items-center gap-2 p-2 rounded-xl text-left hover:bg-emerald-50 hover:text-emerald-900 border border-transparent hover:border-emerald-200 transition-colors"
-              >
-                <div className="h-6 w-6 rounded-lg bg-emerald-100 text-emerald-800 flex items-center justify-center">
-                  <Plus className="h-3.5 w-3.5" />
-                </div>
-                <div>
-                  <span className="font-semibold block text-slate-900">Register Goat</span>
-                  <span className="text-[10px] text-slate-400">Add asset to registry</span>
-                </div>
-              </button>
+              {(role === 'OWNER' || role === 'ADMIN' || role === 'FARM_MANAGER' || role === 'VETERINARIAN') && (
+                <button
+                  onClick={() => handleAction('ADD_GOAT')}
+                  className="flex items-center gap-2 p-2 rounded-xl text-left hover:bg-emerald-50 hover:text-emerald-900 border border-transparent hover:border-emerald-200 transition-colors cursor-pointer"
+                >
+                  <div className="h-6 w-6 rounded-lg bg-emerald-100 text-emerald-800 flex items-center justify-center">
+                    <Plus className="h-3.5 w-3.5" />
+                  </div>
+                  <div>
+                    <span className="font-semibold block text-slate-900">Register Goat</span>
+                    <span className="text-[10px] text-slate-400">Add asset to registry</span>
+                  </div>
+                </button>
+              )}
 
-              <button
-                onClick={() => handleAction('RECORD_WEIGHT')}
-                className="flex items-center gap-2 p-2 rounded-xl text-left hover:bg-sky-50 hover:text-sky-900 border border-transparent hover:border-sky-200 transition-colors"
-              >
-                <div className="h-6 w-6 rounded-lg bg-sky-100 text-sky-800 flex items-center justify-center">
-                  <Scale className="h-3.5 w-3.5" />
-                </div>
-                <div>
-                  <span className="font-semibold block text-slate-900">Record Weight</span>
-                  <span className="text-[10px] text-slate-400">Track ADG gain</span>
-                </div>
-              </button>
+              {permissions?.canRecordWeight && (
+                <button
+                  onClick={() => handleAction('RECORD_WEIGHT')}
+                  className="flex items-center gap-2 p-2 rounded-xl text-left hover:bg-sky-50 hover:text-sky-900 border border-transparent hover:border-sky-200 transition-colors cursor-pointer"
+                >
+                  <div className="h-6 w-6 rounded-lg bg-sky-100 text-sky-800 flex items-center justify-center">
+                    <Scale className="h-3.5 w-3.5" />
+                  </div>
+                  <div>
+                    <span className="font-semibold block text-slate-900">Record Weight</span>
+                    <span className="text-[10px] text-slate-400">Track ADG gain</span>
+                  </div>
+                </button>
+              )}
 
-              <button
-                onClick={() => handleAction('ISSUE_FEED')}
-                className="flex items-center gap-2 p-2 rounded-xl text-left hover:bg-emerald-50 hover:text-emerald-900 border border-transparent hover:border-emerald-200 transition-colors"
-              >
-                <div className="h-6 w-6 rounded-lg bg-emerald-100 text-emerald-800 flex items-center justify-center">
-                  <Wheat className="h-3.5 w-3.5" />
-                </div>
-                <div>
-                  <span className="font-semibold block text-slate-900">Issue Feed</span>
-                  <span className="text-[10px] text-slate-400">Allocate cost to pen</span>
-                </div>
-              </button>
+              {permissions?.canIssueFeed && (
+                <button
+                  onClick={() => handleAction('ISSUE_FEED')}
+                  className="flex items-center gap-2 p-2 rounded-xl text-left hover:bg-emerald-50 hover:text-emerald-900 border border-transparent hover:border-emerald-200 transition-colors cursor-pointer"
+                >
+                  <div className="h-6 w-6 rounded-lg bg-emerald-100 text-emerald-800 flex items-center justify-center">
+                    <Wheat className="h-3.5 w-3.5" />
+                  </div>
+                  <div>
+                    <span className="font-semibold block text-slate-900">Issue Feed</span>
+                    <span className="text-[10px] text-slate-400">Allocate cost to pen</span>
+                  </div>
+                </button>
+              )}
             </div>
           </div>
 

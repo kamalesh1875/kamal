@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { PosService } from '@/lib/services/pos-service';
 import { farmStore } from '@/lib/services/farm-store';
+import { authorizeApiRequest } from '@/lib/auth';
 
 export async function GET(req: NextRequest) {
   try {
@@ -24,6 +25,12 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
+    // API Authorization check
+    const auth = authorizeApiRequest(req, 'canAccessPos');
+    if (!auth.authorized) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status });
+    }
+
     const body = await req.json();
 
     if (!body.customerId || !body.items || !body.paymentMethod) {

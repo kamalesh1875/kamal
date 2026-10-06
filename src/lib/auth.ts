@@ -41,6 +41,22 @@ export const SEED_USERS: Record<string, AuthUser & { password: string }> = {
     email: 'cashier@mskgoat.com',
     role: 'CASHIER',
     password: 'cashier123'
+  },
+  'manager@mskgoat.com': {
+    id: 'usr-manager-1',
+    farmId: 'farm-msk-pollachi',
+    name: 'Suresh (Farm Operations Manager)',
+    email: 'manager@mskgoat.com',
+    role: 'FARM_MANAGER',
+    password: 'manager123'
+  },
+  'accountant@mskgoat.com': {
+    id: 'usr-accountant-1',
+    farmId: 'farm-msk-pollachi',
+    name: 'Anand (Commercial Accountant)',
+    email: 'accountant@mskgoat.com',
+    role: 'ACCOUNTANT',
+    password: 'accountant123'
   }
 };
 
@@ -73,7 +89,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, RolePermissions> = {
     canIssueFeed: true,
     canCancelSales: true,
     canViewAuditLogs: true,
-    allowedNavTabs: ['dashboard', 'goats', 'weight', 'health', 'ai-health', 'pens', 'pos', 'sales', 'customers', 'inventory', 'tasks', 'finance', 'expenses', 'audit']
+    allowedNavTabs: ['dashboard', 'goats', 'weight', 'health', 'ai-health', 'pens', 'pos', 'sales', 'customers', 'inventory', 'tasks', 'finance', 'expenses', 'audit', 'settings']
   },
   ADMIN: {
     canViewProfit: true,
@@ -86,7 +102,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, RolePermissions> = {
     canIssueFeed: true,
     canCancelSales: true,
     canViewAuditLogs: true,
-    allowedNavTabs: ['dashboard', 'goats', 'weight', 'health', 'ai-health', 'pens', 'pos', 'sales', 'customers', 'inventory', 'tasks', 'finance', 'expenses', 'audit']
+    allowedNavTabs: ['dashboard', 'goats', 'weight', 'health', 'ai-health', 'pens', 'pos', 'sales', 'customers', 'inventory', 'tasks', 'finance', 'expenses', 'audit', 'settings']
   },
   FARM_MANAGER: {
     canViewProfit: false,
@@ -165,6 +181,38 @@ export function checkPermission(role: UserRole, permission: keyof RolePermission
 }
 
 /**
+ * Check if a tab/route identifier is allowed for a user role
+ */
+export function isTabAllowed(role: UserRole, tab: string): boolean {
+  const perm = ROLE_PERMISSIONS[role];
+  if (!perm) return false;
+  // Normalize tab by removing leading slash if present
+  const cleanTab = tab.replace(/^\//, '');
+  if (cleanTab === '' || cleanTab === 'dashboard') return true;
+  return perm.allowedNavTabs.includes(cleanTab);
+}
+
+/**
+ * Destination route after login based on authenticated role
+ */
+export function getDefaultRouteForRole(role: UserRole): string {
+  switch (role) {
+    case 'CASHIER':
+      return '/pos';
+    case 'VETERINARIAN':
+      return '/dashboard';
+    case 'WORKER':
+      return '/dashboard';
+    case 'OWNER':
+    case 'ADMIN':
+    case 'FARM_MANAGER':
+    case 'ACCOUNTANT':
+    default:
+      return '/dashboard';
+  }
+}
+
+/**
  * Simple collision-safe base64 session token generator for demonstration and production
  */
 export function createSessionToken(user: AuthUser): string {
@@ -193,4 +241,64 @@ export function parseSessionToken(token: string): AuthUser | null {
   } catch {
     return null;
   }
+}
+
+/**
+ * Extract authenticated user from incoming request (cookies or Bearer header)
+ */
+export function getAuthUserFromRequest(req: Request | any): AuthUser | null {
+  try {
+    let token: string | undefined;
+
+    // NextRequest cookies
+    if (req.cookies && typeof req.cookies.get === 'function') {
+      token = req.cookies.get('goatfarm_session')?.value;
+    }
+
+    // Header cookies fallback
+    if (!token && req.headers) {
+      const cookieHeader = typeof req.headers.get === 'function' ? req.headers.get('cookie') : req.headers.cookie;
+      if (cookieHeader) {
+        const match = cookieHeader.match(/goatfarm_session=([^;]+)/);
+        if (match) token = match[1];
+      }
+
+      // Authorization header fallback
+      if (!token) {
+        const authHeader = typeof req.headers.get === 'function' ? req.headers.get('authorization') : req.headers.authorization;
+        if (authHeader && authHeader.startsWith('Bearer ')) {
+          token = authHeader.substring(7).trim();
+        }
+      }
+    }
+
+    if (!token) return null;
+    return parseSessionToken(token);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Authorize API requests based on permissions
+ */
+export function authorizeApiRequest(
+  req: Request | any,
+  permission?: keyof RolePermissions
+): { authorized: boolean; user: AuthUser | null; error?: string; status: number } {
+  const user = getAuthUserFromRequest(req);
+  if (!user) {
+    return { authorized: false, user: null, error: 'Unauthorized: Session required. Please log in.', status: 401 };
+  }
+
+  if (permission && !checkPermission(user.role, permission)) {
+    return {
+      authorized: false,
+      user,
+      error: `Forbidden: Role ${user.role} lacks permission '${permission}'`,
+      status: 403
+    };
+  }
+
+  return { authorized: true, user, status: 200 };
 }

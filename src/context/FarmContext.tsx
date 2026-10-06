@@ -14,6 +14,7 @@ import {
   ActivityAuditLog,
   UserRole
 } from '@/types/farm';
+import { AuthUser, ROLE_PERMISSIONS } from '@/lib/auth';
 import {
   INITIAL_GOATS,
   INITIAL_PENS,
@@ -39,6 +40,15 @@ export interface OverdueAlert {
 }
 
 interface FarmContextType {
+  // Authentication & Session
+  currentUser: AuthUser | null;
+  setCurrentUser: (user: AuthUser | null) => void;
+  isAuthenticated: boolean;
+  isAuthLoading: boolean;
+  login: (email: string, password: string) => Promise<{ success: boolean; error?: string; user?: AuthUser }>;
+  logout: () => Promise<void>;
+  refreshSession: () => Promise<void>;
+
   // Current user role
   currentRole: UserRole;
   setCurrentRole: (role: UserRole) => void;
@@ -94,7 +104,9 @@ interface FarmContextType {
 const FarmContext = createContext<FarmContextType | undefined>(undefined);
 
 export const FarmProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
   const [currentRole, setCurrentRole] = useState<UserRole>('OWNER');
+  const [isAuthLoading, setIsAuthLoading] = useState<boolean>(true);
   const [activeTab, setActiveTab] = useState<string>('dashboard');
   const [selectedGoatId, setSelectedGoatId] = useState<string | null>('goat-1');
   const [isCommandMenuOpen, setIsCommandMenuOpen] = useState(false);
@@ -125,8 +137,43 @@ export const FarmProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   ]);
 
-  // Load from local storage or server on mount
+  // Load auth session and local storage on mount
   useEffect(() => {
+    // 1. Hydrate authentication session from live server
+    fetch('/api/auth')
+      .then(res => res.json())
+      .then(data => {
+        if (data.user) {
+          setCurrentUser(data.user);
+          setCurrentRole(data.user.role);
+          try {
+            localStorage.setItem('msk_user', JSON.stringify(data.user));
+          } catch {}
+        } else {
+          // Fallback to local storage if offline
+          try {
+            const savedUser = localStorage.getItem('msk_user');
+            if (savedUser) {
+              const u = JSON.parse(savedUser);
+              setCurrentUser(u);
+              setCurrentRole(u.role);
+            }
+          } catch {}
+        }
+      })
+      .catch(() => {
+        try {
+          const savedUser = localStorage.getItem('msk_user');
+          if (savedUser) {
+            const u = JSON.parse(savedUser);
+            setCurrentUser(u);
+            setCurrentRole(u.role);
+          }
+        } catch {}
+      })
+      .finally(() => {
+        setIsAuthLoading(false);
+      });
     try {
       const savedGoats = localStorage.getItem('msk_goats');
       if (savedGoats) setGoats(JSON.parse(savedGoats));
@@ -535,9 +582,69 @@ export const FarmProvider: React.FC<{ children: React.ReactNode }> = ({ children
     logAudit('SYSTEM_RESET', 'All demo data reset to default factory state', 'LIVESTOCK');
   };
 
+  // Authentication Handlers
+  const login = async (email: string, password: string) => {
+    try {
+      setIsAuthLoading(true);
+      const res = await fetch('/api/auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password })
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        return { success: false, error: data.error || 'Invalid credentials' };
+      }
+      setCurrentUser(data.user);
+      setCurrentRole(data.user.role);
+      try {
+        localStorage.setItem('msk_user', JSON.stringify(data.user));
+      } catch {}
+      logAudit('LOGIN_SUCCESS', `User ${data.user.name} logged in as ${data.user.role}`, 'AUTH');
+      return { success: true, user: data.user };
+    } catch (e: any) {
+      return { success: false, error: e.message || 'Login request failed' };
+    } finally {
+      setIsAuthLoading(false);
+    }
+  };
+
+  const logout = async () => {
+    try {
+      await fetch('/api/auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'logout' })
+      });
+    } catch {}
+    setCurrentUser(null);
+    try {
+      localStorage.removeItem('msk_user');
+    } catch {}
+    window.location.href = '/login';
+  };
+
+  const refreshSession = async () => {
+    try {
+      const res = await fetch('/api/auth');
+      const data = await res.json();
+      if (data.user) {
+        setCurrentUser(data.user);
+        setCurrentRole(data.user.role);
+      }
+    } catch {}
+  };
+
   return (
     <FarmContext.Provider
       value={{
+        currentUser,
+        setCurrentUser,
+        isAuthenticated: !!currentUser,
+        isAuthLoading,
+        login,
+        logout,
+        refreshSession,
         currentRole,
         setCurrentRole,
         goats,
@@ -586,4 +693,19 @@ export const useFarm = () => {
     throw new Error('useFarm must be used within a FarmProvider');
   }
   return context;
+};
+
+export const useAuth = () => {
+  const { currentUser, currentRole, isAuthenticated, isAuthLoading, login, logout, refreshSession } = useFarm();
+  return {
+    user: currentUser,
+    role: currentRole,
+    permissions: ROLE_PERMISSIONS[currentRole],
+    isAuthenticated,
+    isLoading: isAuthLoading,
+    isAuthLoading,
+    login,
+    logout,
+    refreshSession
+  };
 };

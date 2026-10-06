@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { VetReviewService } from '@/ai-health/vet-review/vet-review-service';
+import { authorizeApiRequest } from '@/lib/auth';
 
 export async function GET(req: NextRequest) {
   try {
@@ -19,6 +20,11 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
+    const auth = authorizeApiRequest(req, 'canManageVeterinary');
+    if (!auth.authorized) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status });
+    }
+
     const body = await req.json();
 
     if (!body.goatId || !body.vetName || !body.reviewStatus || !body.clinicalObservation) {
