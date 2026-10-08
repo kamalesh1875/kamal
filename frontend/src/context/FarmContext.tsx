@@ -599,6 +599,9 @@ export const FarmProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setCurrentRole(data.user.role);
       try {
         localStorage.setItem('msk_user', JSON.stringify(data.user));
+        if (data.token) {
+          localStorage.setItem('msk_token', data.token);
+        }
       } catch {}
       logAudit('LOGIN_SUCCESS', `User ${data.user.name} logged in as ${data.user.role}`, 'AUTH');
       return { success: true, user: data.user };
@@ -620,6 +623,7 @@ export const FarmProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setCurrentUser(null);
     try {
       localStorage.removeItem('msk_user');
+      localStorage.removeItem('msk_token');
     } catch {}
     window.location.href = '/login';
   };

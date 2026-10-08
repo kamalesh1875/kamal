@@ -74,6 +74,7 @@ export interface RolePermissions {
   canIssueFeed: boolean;
   canCancelSales: boolean;
   canViewAuditLogs: boolean;
+  canManageLivestock: boolean;
   allowedNavTabs: string[];
 }
 
@@ -89,6 +90,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, RolePermissions> = {
     canIssueFeed: true,
     canCancelSales: true,
     canViewAuditLogs: true,
+    canManageLivestock: true,
     allowedNavTabs: ['dashboard', 'goats', 'weight', 'health', 'ai-health', 'pens', 'pos', 'sales', 'customers', 'inventory', 'tasks', 'finance', 'expenses', 'audit', 'settings']
   },
   ADMIN: {
@@ -102,6 +104,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, RolePermissions> = {
     canIssueFeed: true,
     canCancelSales: true,
     canViewAuditLogs: true,
+    canManageLivestock: true,
     allowedNavTabs: ['dashboard', 'goats', 'weight', 'health', 'ai-health', 'pens', 'pos', 'sales', 'customers', 'inventory', 'tasks', 'finance', 'expenses', 'audit', 'settings']
   },
   FARM_MANAGER: {
@@ -115,6 +118,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, RolePermissions> = {
     canIssueFeed: true,
     canCancelSales: false,
     canViewAuditLogs: true,
+    canManageLivestock: true,
     allowedNavTabs: ['dashboard', 'goats', 'weight', 'health', 'ai-health', 'pens', 'pos', 'sales', 'customers', 'inventory', 'tasks', 'expenses', 'audit']
   },
   ACCOUNTANT: {
@@ -128,6 +132,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, RolePermissions> = {
     canIssueFeed: false,
     canCancelSales: false,
     canViewAuditLogs: true,
+    canManageLivestock: false,
     allowedNavTabs: ['dashboard', 'sales', 'customers', 'finance', 'expenses', 'audit']
   },
   VETERINARIAN: {
@@ -141,6 +146,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, RolePermissions> = {
     canIssueFeed: true,
     canCancelSales: false,
     canViewAuditLogs: false,
+    canManageLivestock: true,
     allowedNavTabs: ['dashboard', 'goats', 'weight', 'health', 'ai-health', 'pens', 'tasks']
   },
   WORKER: {
@@ -154,6 +160,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, RolePermissions> = {
     canIssueFeed: true,
     canCancelSales: false,
     canViewAuditLogs: false,
+    canManageLivestock: false,
     allowedNavTabs: ['dashboard', 'goats', 'weight', 'pens', 'tasks']
   },
   CASHIER: {
@@ -167,6 +174,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, RolePermissions> = {
     canIssueFeed: false,
     canCancelSales: false,
     canViewAuditLogs: false,
+    canManageLivestock: false,
     allowedNavTabs: ['dashboard', 'pos', 'sales', 'customers']
   }
 };

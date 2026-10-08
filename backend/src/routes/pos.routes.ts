@@ -1,12 +1,12 @@
 import { Router, Request, Response } from 'express';
 import { PosService } from '@/lib/services/pos-service';
 import { farmStore } from '@/lib/services/farm-store';
-import { authorizeApiRequest } from '@/lib/auth';
+import { requireAuth, requirePermission } from '@/middleware/auth.middleware';
 
 const router = Router();
 
-// POST /api/pos/calculate
-router.post('/calculate', (req: Request, res: Response) => {
+// POST /api/pos/calculate - Requires POS access
+router.post('/calculate', requirePermission('canAccessPos'), (req: Request, res: Response) => {
   try {
     const body = req.body;
 
@@ -26,8 +26,8 @@ router.post('/calculate', (req: Request, res: Response) => {
   }
 });
 
-// GET /api/pos/sales
-router.get('/sales', (req: Request, res: Response) => {
+// GET /api/pos/sales - Authenticated staff
+router.get('/sales', requireAuth, (req: Request, res: Response) => {
   try {
     const customerId = req.query.customerId as string | undefined;
     const status = req.query.status as string | undefined;
@@ -46,14 +46,9 @@ router.get('/sales', (req: Request, res: Response) => {
   }
 });
 
-// POST /api/pos/sales
-router.post('/sales', (req: Request, res: Response) => {
+// POST /api/pos/sales - Requires POS access (Owner, Manager, Cashier)
+router.post('/sales', requirePermission('canAccessPos'), (req: Request, res: Response) => {
   try {
-    const auth = authorizeApiRequest(req, 'canAccessPos');
-    if (!auth.authorized) {
-      return res.status(auth.status).json({ error: auth.error });
-    }
-
     const body = req.body;
 
     if (!body.customerId || !body.items || !body.paymentMethod) {
@@ -63,14 +58,22 @@ router.post('/sales', (req: Request, res: Response) => {
     }
 
     const sale = PosService.createSale(body);
+    farmStore.logAudit(
+      'CREATE_SALE',
+      `Issued POS Invoice ${sale.invoiceNumber} for ₹${sale.totalAmount}`,
+      'POS',
+      req.user?.name,
+      req.user?.role
+    );
+
     return res.status(201).json({ success: true, sale });
   } catch (error: any) {
     return res.status(400).json({ error: error.message || 'Failed to create sale transaction' });
   }
 });
 
-// POST /api/pos/sales/:id/cancel
-router.post('/sales/:id/cancel', (req: Request, res: Response) => {
+// POST /api/pos/sales/:id/cancel - Requires Cancel Sales permission (Owner/Admin only)
+router.post('/sales/:id/cancel', requirePermission('canCancelSales'), (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const body = req.body;
@@ -82,7 +85,16 @@ router.post('/sales/:id/cancel', (req: Request, res: Response) => {
       });
     }
 
-    const cancelledSale = PosService.cancelSale(id, reason, body.cancelledBy || 'Owner');
+    const cancelledBy = req.user?.name || body.cancelledBy || 'Owner';
+    const cancelledSale = PosService.cancelSale(id, reason, cancelledBy);
+
+    farmStore.logAudit(
+      'CANCEL_SALE',
+      `Voided Invoice ${cancelledSale.invoiceNumber}. Reason: ${reason}`,
+      'POS',
+      req.user?.name,
+      req.user?.role
+    );
 
     return res.json({
       success: true,

@@ -1,12 +1,18 @@
 import { Router, Request, Response } from 'express';
 import { farmStore } from '@/lib/services/farm-store';
 import { LedgerService } from '@/lib/services/ledger-service';
+import { checkPermission } from '@/lib/auth';
+import { requireAuth } from '@/middleware/auth.middleware';
 
 const router = Router();
 
-// GET /api/dashboard
-router.get('/', (_req: Request, res: Response) => {
+// GET /api/dashboard - Authenticated staff with role-based field sanitization
+router.get('/', requireAuth, (req: Request, res: Response) => {
   try {
+    const user = req.user!;
+    const canSeeFinance = checkPermission(user.role, 'canViewFinance');
+    const canSeeProfit = checkPermission(user.role, 'canViewProfit');
+
     const { goats, sales, expenses, inventory, tasks } = farmStore;
 
     // Layer 1: Commercial & Financial
@@ -34,19 +40,19 @@ router.get('/', (_req: Request, res: Response) => {
     const mortalityRate = goats.length > 0 ? ((deadGoatsCount / goats.length) * 100).toFixed(1) : '0.0';
 
     // Layer 3: Overdue Alerts & Operations
-    const overdueAlerts = LedgerService.getOverdueAlerts();
+    const overdueAlerts = canSeeFinance ? LedgerService.getOverdueAlerts() : [];
     const lowStockItems = inventory.filter(i => i.currentStock <= i.minimumStockLevel);
 
     return res.json({
-      commercial: {
+      commercial: canSeeFinance ? {
         totalSalesRevenue,
         totalCashCollected,
         totalExpenses,
         totalLivestockAssetValue,
-        totalTrueCostInvested,
-        unrealizedMargin,
+        totalTrueCostInvested: canSeeProfit ? totalTrueCostInvested : null,
+        unrealizedMargin: canSeeProfit ? unrealizedMargin : null,
         totalOutstandingCredit
-      },
+      } : null,
       biological: {
         activeGoatsCount: activeGoats.length,
         soldGoatsCount,

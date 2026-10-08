@@ -1,11 +1,12 @@
 import { Router, Request, Response } from 'express';
 import { GoatService, GoatFilterParams } from '@/lib/services/goat-service';
 import { farmStore } from '@/lib/services/farm-store';
+import { requireAuth, requirePermission } from '@/middleware/auth.middleware';
 
 const router = Router();
 
-// GET /api/goats
-router.get('/', (req: Request, res: Response) => {
+// GET /api/goats - Authenticated staff
+router.get('/', requireAuth, (req: Request, res: Response) => {
   try {
     const q = req.query;
     const params: GoatFilterParams = {
@@ -31,8 +32,8 @@ router.get('/', (req: Request, res: Response) => {
   }
 });
 
-// POST /api/goats
-router.post('/', (req: Request, res: Response) => {
+// POST /api/goats - Requires livestock management permission
+router.post('/', requirePermission('canManageLivestock'), (req: Request, res: Response) => {
   try {
     const body = req.body;
 
@@ -43,14 +44,21 @@ router.post('/', (req: Request, res: Response) => {
     }
 
     const newGoat = GoatService.registerGoat(body);
+    farmStore.logAudit(
+      'CREATE_GOAT',
+      `Registered new ${newGoat.breed} goat ${newGoat.tagNumber}`,
+      'LIVESTOCK',
+      req.user?.name,
+      req.user?.role
+    );
     return res.status(201).json({ success: true, goat: newGoat });
   } catch (error: any) {
     return res.status(400).json({ error: error.message || 'Failed to register goat' });
   }
 });
 
-// GET /api/goats/:id
-router.get('/:id', (req: Request, res: Response) => {
+// GET /api/goats/:id - Authenticated staff
+router.get('/:id', requireAuth, (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const goat = GoatService.getGoatById(id);
@@ -65,8 +73,8 @@ router.get('/:id', (req: Request, res: Response) => {
   }
 });
 
-// PATCH /api/goats/:id
-router.patch('/:id', (req: Request, res: Response) => {
+// PATCH /api/goats/:id - Requires livestock management permission
+router.patch('/:id', requirePermission('canManageLivestock'), (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const body = req.body;
@@ -96,11 +104,41 @@ router.patch('/:id', (req: Request, res: Response) => {
     }
 
     farmStore.recomputeGoat(id);
-    farmStore.logAudit('UPDATE_GOAT', `Updated profile for goat ${goat.tagNumber}`, 'LIVESTOCK');
+    farmStore.logAudit(
+      'UPDATE_GOAT',
+      `Updated profile for goat ${goat.tagNumber}`,
+      'LIVESTOCK',
+      req.user?.name,
+      req.user?.role
+    );
 
     return res.json({ success: true, goat });
   } catch (error: any) {
     return res.status(500).json({ error: error.message || 'Error updating goat profile' });
+  }
+});
+
+// DELETE /api/goats/:id - Requires owner/admin settings permission
+router.delete('/:id', requirePermission('canViewOwnerSettings'), (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const index = farmStore.goats.findIndex(g => g.id === id);
+    if (index === -1) {
+      return res.status(404).json({ error: `Goat with ID ${id} not found` });
+    }
+
+    const [removed] = farmStore.goats.splice(index, 1);
+    farmStore.logAudit(
+      'DELETE_GOAT',
+      `Deleted goat profile ${removed.tagNumber} (${removed.id})`,
+      'LIVESTOCK',
+      req.user?.name,
+      req.user?.role
+    );
+
+    return res.json({ success: true, message: `Goat ${removed.tagNumber} removed successfully` });
+  } catch (error: any) {
+    return res.status(500).json({ error: error.message || 'Error deleting goat' });
   }
 });
 

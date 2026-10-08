@@ -1,10 +1,11 @@
 import { Router, Request, Response } from 'express';
 import { farmStore } from '@/lib/services/farm-store';
+import { requirePermission } from '@/middleware/auth.middleware';
 
 const router = Router();
 
-// GET /api/audit
-router.get('/', (req: Request, res: Response) => {
+// GET /api/audit - Requires audit logs view permission
+router.get('/', requirePermission('canViewAuditLogs'), (req: Request, res: Response) => {
   try {
     const moduleFilter = req.query.module as string | undefined;
 

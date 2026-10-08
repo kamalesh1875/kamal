@@ -2,11 +2,12 @@ import { Router, Request, Response } from 'express';
 import { farmStore } from '@/lib/services/farm-store';
 import { GoatService } from '@/lib/services/goat-service';
 import { PosService } from '@/lib/services/pos-service';
+import { requireAuth } from '@/middleware/auth.middleware';
 
 const router = Router();
 
-// POST /api/mobile-sync
-router.post('/', (req: Request, res: Response) => {
+// POST /api/mobile-sync - Requires authenticated field staff
+router.post('/', requireAuth, (req: Request, res: Response) => {
   try {
     const action = req.body;
 

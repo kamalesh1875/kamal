@@ -2,11 +2,13 @@ import { Router, Request, Response } from 'express';
 import { farmStore } from '@/lib/services/farm-store';
 import { LedgerService } from '@/lib/services/ledger-service';
 import { Customer } from '@/types/farm';
+import { requireAuth, requirePermission } from '@/middleware/auth.middleware';
+import { checkPermission } from '@/lib/auth';
 
 const router = Router();
 
-// GET /api/customers
-router.get('/', (_req: Request, res: Response) => {
+// GET /api/customers - Authenticated staff
+router.get('/', requireAuth, (_req: Request, res: Response) => {
   try {
     const customers = farmStore.customers;
     return res.json({ customers });
@@ -15,9 +17,14 @@ router.get('/', (_req: Request, res: Response) => {
   }
 });
 
-// POST /api/customers
-router.post('/', (req: Request, res: Response) => {
+// POST /api/customers - Requires Customer Credit or POS access
+router.post('/', requireAuth, (req: Request, res: Response) => {
   try {
+    const user = req.user!;
+    if (!checkPermission(user.role, 'canAccessCustomerCredit') && !checkPermission(user.role, 'canAccessPos')) {
+      return res.status(403).json({ error: `Forbidden: Role ${user.role} lacks permission to create customers.` });
+    }
+
     const body = req.body;
 
     if (!body.name || !body.phone) {
@@ -42,7 +49,9 @@ router.post('/', (req: Request, res: Response) => {
     farmStore.logAudit(
       'NEW_CUSTOMER',
       `Registered trader ${newCustomer.name} (${newCustomer.businessName || 'Trader'}) with ₹${newCustomer.creditLimit.toLocaleString('en-IN')} credit limit`,
-      'POS'
+      'POS',
+      user.name,
+      user.role
     );
 
     return res.status(201).json({ success: true, customer: newCustomer });
@@ -51,8 +60,8 @@ router.post('/', (req: Request, res: Response) => {
   }
 });
 
-// GET /api/customers/:id/ledger
-router.get('/:id/ledger', (req: Request, res: Response) => {
+// GET /api/customers/:id/ledger - Requires customer credit permission
+router.get('/:id/ledger', requirePermission('canAccessCustomerCredit'), (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const profile = LedgerService.getCustomerFinancialProfile(id);

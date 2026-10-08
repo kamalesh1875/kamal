@@ -2,11 +2,12 @@ import { Router, Request, Response } from 'express';
 import { aiStore } from '@/ai-health/services/ai-store';
 import { AiChatService } from '@/ai-health/services/ai-chat-service';
 import { ModelMonitoringService } from '@/ai-health/monitoring/model-monitoring-service';
+import { requireAuth } from '@/middleware/auth.middleware';
 
 const router = Router();
 
-// GET /api/ai-health/alerts
-router.get('/alerts', (req: Request, res: Response) => {
+// GET /api/ai-health/alerts - Authenticated staff
+router.get('/alerts', requireAuth, (req: Request, res: Response) => {
   try {
     const severity = req.query.severity as string | undefined;
     const status = req.query.status as string | undefined;
@@ -25,8 +26,8 @@ router.get('/alerts', (req: Request, res: Response) => {
   }
 });
 
-// GET /api/ai-health/cameras
-router.get('/cameras', (_req: Request, res: Response) => {
+// GET /api/ai-health/cameras - Authenticated staff
+router.get('/cameras', requireAuth, (_req: Request, res: Response) => {
   try {
     return res.json({ cameras: aiStore.cameras, events: aiStore.cameraEvents.slice(0, 50) });
   } catch (error: any) {
@@ -34,8 +35,8 @@ router.get('/cameras', (_req: Request, res: Response) => {
   }
 });
 
-// POST /api/ai-health/chat
-router.post('/chat', async (req: Request, res: Response) => {
+// POST /api/ai-health/chat - Authenticated staff
+router.post('/chat', requireAuth, async (req: Request, res: Response) => {
   try {
     const body = req.body;
     const query = body.query || body.message;
@@ -51,8 +52,8 @@ router.post('/chat', async (req: Request, res: Response) => {
   }
 });
 
-// GET /api/ai-health/environment
-router.get('/environment', (_req: Request, res: Response) => {
+// GET /api/ai-health/environment - Authenticated staff
+router.get('/environment', requireAuth, (_req: Request, res: Response) => {
   try {
     return res.json({ readings: aiStore.environmentReadings });
   } catch (error: any) {
@@ -60,8 +61,8 @@ router.get('/environment', (_req: Request, res: Response) => {
   }
 });
 
-// GET /api/ai-health/metrics
-router.get('/metrics', (_req: Request, res: Response) => {
+// GET /api/ai-health/metrics - Authenticated staff
+router.get('/metrics', requireAuth, (_req: Request, res: Response) => {
   try {
     return res.json({
       modelMetrics: aiStore.modelMetrics,
@@ -72,8 +73,8 @@ router.get('/metrics', (_req: Request, res: Response) => {
   }
 });
 
-// GET /api/ai-health/observations
-router.get('/observations', (req: Request, res: Response) => {
+// GET /api/ai-health/observations - Authenticated staff
+router.get('/observations', requireAuth, (req: Request, res: Response) => {
   try {
     const goatId = req.query.goatId as string | undefined;
     const method = req.query.method as string | undefined;
@@ -92,8 +93,8 @@ router.get('/observations', (req: Request, res: Response) => {
   }
 });
 
-// POST /api/ai-health/observations
-router.post('/observations', (req: Request, res: Response) => {
+// POST /api/ai-health/observations - Authenticated staff
+router.post('/observations', requireAuth, (req: Request, res: Response) => {
   try {
     const body = req.body;
     const newObs = {

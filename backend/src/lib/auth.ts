@@ -1,5 +1,7 @@
 import { UserRole } from '@/types/farm';
 
+export { UserRole };
+
 export interface AuthUser {
   id: string;
   farmId: string;
@@ -74,6 +76,7 @@ export interface RolePermissions {
   canIssueFeed: boolean;
   canCancelSales: boolean;
   canViewAuditLogs: boolean;
+  canManageLivestock: boolean;
   allowedNavTabs: string[];
 }
 
@@ -89,6 +92,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, RolePermissions> = {
     canIssueFeed: true,
     canCancelSales: true,
     canViewAuditLogs: true,
+    canManageLivestock: true,
     allowedNavTabs: ['dashboard', 'goats', 'weight', 'health', 'ai-health', 'pens', 'pos', 'sales', 'customers', 'inventory', 'tasks', 'finance', 'expenses', 'audit', 'settings']
   },
   ADMIN: {
@@ -102,6 +106,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, RolePermissions> = {
     canIssueFeed: true,
     canCancelSales: true,
     canViewAuditLogs: true,
+    canManageLivestock: true,
     allowedNavTabs: ['dashboard', 'goats', 'weight', 'health', 'ai-health', 'pens', 'pos', 'sales', 'customers', 'inventory', 'tasks', 'finance', 'expenses', 'audit', 'settings']
   },
   FARM_MANAGER: {
@@ -115,6 +120,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, RolePermissions> = {
     canIssueFeed: true,
     canCancelSales: false,
     canViewAuditLogs: true,
+    canManageLivestock: true,
     allowedNavTabs: ['dashboard', 'goats', 'weight', 'health', 'ai-health', 'pens', 'pos', 'sales', 'customers', 'inventory', 'tasks', 'expenses', 'audit']
   },
   ACCOUNTANT: {
@@ -128,6 +134,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, RolePermissions> = {
     canIssueFeed: false,
     canCancelSales: false,
     canViewAuditLogs: true,
+    canManageLivestock: false,
     allowedNavTabs: ['dashboard', 'sales', 'customers', 'finance', 'expenses', 'audit']
   },
   VETERINARIAN: {
@@ -141,6 +148,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, RolePermissions> = {
     canIssueFeed: true,
     canCancelSales: false,
     canViewAuditLogs: false,
+    canManageLivestock: true,
     allowedNavTabs: ['dashboard', 'goats', 'weight', 'health', 'ai-health', 'pens', 'tasks']
   },
   WORKER: {
@@ -154,6 +162,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, RolePermissions> = {
     canIssueFeed: true,
     canCancelSales: false,
     canViewAuditLogs: false,
+    canManageLivestock: false,
     allowedNavTabs: ['dashboard', 'goats', 'weight', 'pens', 'tasks']
   },
   CASHIER: {
@@ -167,6 +176,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, RolePermissions> = {
     canIssueFeed: false,
     canCancelSales: false,
     canViewAuditLogs: false,
+    canManageLivestock: false,
     allowedNavTabs: ['dashboard', 'pos', 'sales', 'customers']
   }
 };
@@ -244,32 +254,42 @@ export function parseSessionToken(token: string): AuthUser | null {
 }
 
 /**
- * Extract authenticated user from incoming request (cookies or Bearer header)
+ * Extract authenticated user from incoming request (cookies, header, or Bearer token)
  */
 export function getAuthUserFromRequest(req: Request | any): AuthUser | null {
   try {
     let token: string | undefined;
 
-    // NextRequest cookies
-    if (req.cookies && typeof req.cookies.get === 'function') {
+    // 1. Direct cookie from cookie-parser (Express standard)
+    if (req.cookies && typeof req.cookies === 'object' && req.cookies.goatfarm_session) {
+      token = req.cookies.goatfarm_session;
+    }
+
+    // 2. NextRequest cookies (Next.js standard)
+    if (!token && req.cookies && typeof req.cookies.get === 'function') {
       token = req.cookies.get('goatfarm_session')?.value;
     }
 
-    // Header cookies fallback
+    // 3. Raw cookie header string
     if (!token && req.headers) {
-      const cookieHeader = typeof req.headers.get === 'function' ? req.headers.get('cookie') : req.headers.cookie;
-      if (cookieHeader) {
+      const cookieHeader = typeof req.headers.get === 'function' ? req.headers.get('cookie') : (req.headers.cookie || req.headers.Cookie);
+      if (cookieHeader && typeof cookieHeader === 'string') {
         const match = cookieHeader.match(/goatfarm_session=([^;]+)/);
         if (match) token = match[1];
       }
+    }
 
-      // Authorization header fallback
-      if (!token) {
-        const authHeader = typeof req.headers.get === 'function' ? req.headers.get('authorization') : req.headers.authorization;
-        if (authHeader && authHeader.startsWith('Bearer ')) {
-          token = authHeader.substring(7).trim();
-        }
+    // 4. Authorization: Bearer <token>
+    if (!token && req.headers) {
+      const authHeader = typeof req.headers.get === 'function' ? req.headers.get('authorization') : (req.headers.authorization || req.headers.Authorization);
+      if (authHeader && typeof authHeader === 'string' && authHeader.startsWith('Bearer ')) {
+        token = authHeader.substring(7).trim();
       }
+    }
+
+    // 5. Query parameter token (for mobile/testing fallback)
+    if (!token && req.query?.token && typeof req.query.token === 'string') {
+      token = req.query.token;
     }
 
     if (!token) return null;

@@ -2,8 +2,9 @@
 
 import React, { useState, useEffect } from 'react';
 import dynamic from 'next/dynamic';
-import { usePathname } from 'next/navigation';
-import { useFarm } from '@/context/FarmContext';
+import { usePathname, useRouter } from 'next/navigation';
+import { useFarm, useAuth } from '@/context/FarmContext';
+import { isTabAllowed } from '@/lib/auth';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { Header } from '@/components/layout/Header';
 import { CommandMenu } from '@/components/modals/CommandMenu';
@@ -25,8 +26,28 @@ interface ErpShellProps {
 
 export const ErpShell: React.FC<ErpShellProps> = ({ children, activeTab: propTab }) => {
   const { setActiveTab } = useFarm();
+  const { user, isAuthLoading, isAuthenticated } = useAuth();
   const pathname = usePathname();
+  const router = useRouter();
   const [isMobileMode, setIsMobileMode] = useState<boolean>(false);
+
+  const currentTab = propTab || (pathname ? pathname.replace(/^\//, '').split('/')[0] : 'dashboard') || 'dashboard';
+
+  // 1. Enforce Authentication & Route Authorization
+  useEffect(() => {
+    if (!isAuthLoading) {
+      if (!isAuthenticated || !user) {
+        const redirectPath = pathname && pathname !== '/' ? `?redirect=${encodeURIComponent(pathname)}` : '';
+        router.replace(`/login${redirectPath}`);
+        return;
+      }
+
+      if (!isTabAllowed(user.role, currentTab)) {
+        router.replace('/unauthorized');
+        return;
+      }
+    }
+  }, [isAuthenticated, user, isAuthLoading, currentTab, pathname, router]);
 
   // Sync activeTab with pathname or propTab
   useEffect(() => {
@@ -65,6 +86,16 @@ export const ErpShell: React.FC<ErpShellProps> = ({ children, activeTab: propTab
     localStorage.setItem('msk_view_mode', 'mobile');
     setIsMobileMode(true);
   };
+
+  // While validating authorization, render skeleton to prevent flashing restricted content
+  if (isAuthLoading) {
+    return <ViewLoadingSkeleton title="Verifying authorization permissions..." />;
+  }
+
+  // If unauthenticated or unauthorized, render nothing while redirect is executed
+  if (!isAuthenticated || !user || !isTabAllowed(user.role, currentTab)) {
+    return null;
+  }
 
   if (isMobileMode) {
     return <MobileAppView onSwitchToDesktop={handleSwitchToDesktop} />;
