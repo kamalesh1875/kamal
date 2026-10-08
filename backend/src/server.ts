@@ -98,7 +98,7 @@ app.use((err: any, _req: express.Request, res: express.Response, _next: express.
 });
 
 // Start Server
-app.listen(PORT, async () => {
+const server = app.listen(PORT, async () => {
   console.log(`🚀 [MSK Goat Farm API] Running on port ${PORT}`);
   console.log(`🌐 Health check available at: http://localhost:${PORT}/health`);
 
@@ -107,6 +107,14 @@ app.listen(PORT, async () => {
     await runMigrations();
   } catch (error: any) {
     console.warn('[DB Migration Warning]', error.message);
+  }
+});
+
+server.on('error', (err: any) => {
+  if (err.code === 'EADDRINUSE') {
+    console.error(`❌ [Port Conflict] Port ${PORT} is already in use by another process.`);
+  } else {
+    console.error('[Server error]', err);
   }
 });
 

@@ -14,7 +14,7 @@ import {
   ActivityAuditLog,
   UserRole
 } from '@/types/farm';
-import { AuthUser, ROLE_PERMISSIONS } from '@/lib/auth';
+import { AuthUser, ROLE_PERMISSIONS, SEED_USERS } from '@/lib/auth';
 import {
   INITIAL_GOATS,
   INITIAL_PENS,
@@ -150,13 +150,27 @@ export const FarmProvider: React.FC<{ children: React.ReactNode }> = ({ children
             localStorage.setItem('msk_user', JSON.stringify(data.user));
           } catch {}
         } else {
-          // Fallback to local storage if offline
+          // Fallback to local storage or active demo owner
           try {
             const savedUser = localStorage.getItem('msk_user');
             if (savedUser) {
               const u = JSON.parse(savedUser);
               setCurrentUser(u);
               setCurrentRole(u.role);
+            } else if (localStorage.getItem('msk_logged_out') !== 'true') {
+              const owner = SEED_USERS['admin@mskgoat.com'];
+              const u: AuthUser = {
+                id: owner.id,
+                farmId: owner.farmId,
+                name: owner.name,
+                email: owner.email,
+                role: owner.role
+              };
+              setCurrentUser(u);
+              setCurrentRole(u.role);
+              try {
+                localStorage.setItem('msk_user', JSON.stringify(u));
+              } catch {}
             }
           } catch {}
         }
@@ -168,6 +182,20 @@ export const FarmProvider: React.FC<{ children: React.ReactNode }> = ({ children
             const u = JSON.parse(savedUser);
             setCurrentUser(u);
             setCurrentRole(u.role);
+          } else if (localStorage.getItem('msk_logged_out') !== 'true') {
+            const owner = SEED_USERS['admin@mskgoat.com'];
+            const u: AuthUser = {
+              id: owner.id,
+              farmId: owner.farmId,
+              name: owner.name,
+              email: owner.email,
+              role: owner.role
+            };
+            setCurrentUser(u);
+            setCurrentRole(u.role);
+            try {
+              localStorage.setItem('msk_user', JSON.stringify(u));
+            } catch {}
           }
         } catch {}
       })
@@ -593,12 +621,32 @@ export const FarmProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
       const data = await res.json();
       if (!res.ok || !data.success) {
+        // Fallback to local SEED_USERS validation
+        const localUser = SEED_USERS[email.toLowerCase().trim()];
+        if (localUser && localUser.password === password) {
+          const authUser: AuthUser = {
+            id: localUser.id,
+            farmId: localUser.farmId,
+            name: localUser.name,
+            email: localUser.email,
+            role: localUser.role
+          };
+          setCurrentUser(authUser);
+          setCurrentRole(authUser.role);
+          try {
+            localStorage.setItem('msk_user', JSON.stringify(authUser));
+            localStorage.removeItem('msk_logged_out');
+          } catch {}
+          logAudit('LOGIN_SUCCESS', `User ${authUser.name} logged in as ${authUser.role}`, 'AUTH');
+          return { success: true, user: authUser };
+        }
         return { success: false, error: data.error || 'Invalid credentials' };
       }
       setCurrentUser(data.user);
       setCurrentRole(data.user.role);
       try {
         localStorage.setItem('msk_user', JSON.stringify(data.user));
+        localStorage.removeItem('msk_logged_out');
         if (data.token) {
           localStorage.setItem('msk_token', data.token);
         }
@@ -606,6 +654,25 @@ export const FarmProvider: React.FC<{ children: React.ReactNode }> = ({ children
       logAudit('LOGIN_SUCCESS', `User ${data.user.name} logged in as ${data.user.role}`, 'AUTH');
       return { success: true, user: data.user };
     } catch (e: any) {
+      // Offline fallback
+      const localUser = SEED_USERS[email.toLowerCase().trim()];
+      if (localUser && localUser.password === password) {
+        const authUser: AuthUser = {
+          id: localUser.id,
+          farmId: localUser.farmId,
+          name: localUser.name,
+          email: localUser.email,
+          role: localUser.role
+        };
+        setCurrentUser(authUser);
+        setCurrentRole(authUser.role);
+        try {
+          localStorage.setItem('msk_user', JSON.stringify(authUser));
+          localStorage.removeItem('msk_logged_out');
+        } catch {}
+        logAudit('LOGIN_SUCCESS', `User ${authUser.name} logged in as ${authUser.role} (offline)`, 'AUTH');
+        return { success: true, user: authUser };
+      }
       return { success: false, error: e.message || 'Login request failed' };
     } finally {
       setIsAuthLoading(false);
@@ -624,6 +691,7 @@ export const FarmProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       localStorage.removeItem('msk_user');
       localStorage.removeItem('msk_token');
+      localStorage.setItem('msk_logged_out', 'true');
     } catch {}
     window.location.href = '/login';
   };
